@@ -1,5 +1,5 @@
 {
-  "name": "tiny-express",
+  "name": "tiny-server-essentials",
   "version": "1.0.0",
   "description": "",
   "scripts": {
@@ -61,6 +61,9 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "express": "^5.1.0"
+    "@types/express": "^5.0.1",
+    "@types/http-errors": "^2.0.4",
+    "express": "^5.1.0",
+    "http-errors": "^2.0.0"
   }
 }
