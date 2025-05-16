@@ -14,9 +14,9 @@ server.app.get('/crash', (req, res) => {
   res.send(yay);
 });
 
-server.installErrors({ errNext: (status, err, req, res) => {
-  server.sendHttpError(res, status);
-} });
+server.installErrors({
+  errNext: (status, err, req, res) => server.sendHttpError(res, status),
+});
 
 server.app.listen(3050, () => {
   console.log('Server is up on port 3050');

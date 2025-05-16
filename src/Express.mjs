@@ -12,8 +12,188 @@ class TinyExpress {
   /** @typedef {import('express').NextFunction} NextFunction */
   /** @typedef {import('http-errors').HttpError} HttpError */
 
+  /** @type {string[]} */
+  #domains = [];
+  #domainTypeChecker = 'hostname';
+  #forbiddenDomainMessage = 'Forbidden domain.';
+
   /**
-   * A list of standard HTTP status codes and their default messages.
+   * Creates and initializes a new TinyExpress instance.
+   *
+   * This wrapper extends the base Express application with support for domain-based request validation,
+   * automatic middleware injection, and customizable validator logic.
+   *
+   * When instantiated, the following behaviors are applied:
+   * - Injects a middleware to validate incoming requests using the active domain validator (based on `#domainTypeChecker`).
+   *   If the validator does not exist or the domain is invalid, a 403 Forbidden error is triggered.
+   * - Automatically registers the default loopback domains: `localhost`, `127.0.0.1`, and `::1`.
+   * - Registers default domain validators for `x-forwarded-host`, `hostname`, and `host` headers.
+   *
+   * @constructor
+   * @param {ExpressApp} [app=express()] - An optional existing Express application instance.
+   *                                       If not provided, a new instance is created using `express()`.
+   */
+  constructor(app = express()) {
+    this.app = app;
+    this.app.use(
+      /** @type {import('express').RequestHandler} */
+      (req, res, next) => {
+        const type = this.#domainTypeChecker;
+        let valid = false;
+        if (type === 'ALL') {
+          const validators = Object.values(this.#domainValidators);
+          for (const validator of validators) {
+            if (typeof validator !== 'function')
+              throw new Error(`Domain validator "${type}" is not registered.`);
+            valid = validator(req);
+            if (valid) break;
+          }
+        } else {
+          const validator = this.#domainValidators[type];
+          if (typeof validator !== 'function')
+            throw new Error(`Domain validator "${type}" is not registered.`);
+          valid = validator(req);
+        }
+        if (!valid) {
+          const err = createHttpError(403, this.#forbiddenDomainMessage);
+          next(err);
+          return;
+        }
+        next();
+      },
+    );
+
+    this.addDomain('localhost');
+    this.addDomain('127.0.0.1');
+    this.addDomain('::1');
+
+    this.addDomainValidator('x-forwarded-host', (req) =>
+      typeof req.headers['x-forwarded-host'] === 'string'
+        ? this.isValidDomain(req.headers['x-forwarded-host'])
+        : false,
+    );
+
+    this.addDomainValidator('hostname', (req) =>
+      typeof req.hostname === 'string' ? this.isValidDomain(req.hostname) : false,
+    );
+
+    this.addDomainValidator('headerHost', (req) =>
+      typeof req.headers.host === 'string' ? this.isValidDomain(req.headers.host) : false,
+    );
+  }
+
+  /**
+   * Registers a domain string into the internal domain list.
+   *
+   * This can be used for domain-based routing, validation, or matching logic.
+   *
+   * @param {string} domain - The domain name to be registered (e.g., 'example.com').
+   * @throws {Error} If the domain is not a string.
+   */
+  addDomain(domain) {
+    if (typeof domain !== 'string') throw new Error('aaahh');
+    this.#domains.push(domain);
+  }
+
+  /**
+   * Removes a domain string from the internal domain list.
+   *
+   * Throws an error if the domain is not registered.
+   *
+   * @param {string} domain - The domain name to be removed (e.g., 'example.com').
+   * @throws {Error} If the domain is not a string.
+   * @throws {Error} If the domain is not found in the list.
+   */
+  removeDomain(domain) {
+    if (typeof domain !== 'string') throw new Error('Domain must be a string.');
+    const index = this.#domains.indexOf(domain);
+    if (index === -1) throw new Error(`Domain "${domain}" not found.`);
+    this.#domains.splice(index, 1);
+  }
+
+  /**
+   * Returns a shallow clone of the internal domain list.
+   *
+   * This ensures the original list remains immutable from the outside.
+   *
+   * @returns {string[]} A cloned array containing all registered domain names.
+   */
+  getDomains() {
+    return [...this.#domains];
+  }
+
+  /**
+   * Registers a new domain validator under a specific key.
+   *
+   * Each validator must be a function that receives an Express `Request` object and returns a boolean.
+   * The key `"ALL"` is reserved and cannot be used as a validator key.
+   *
+   * @param {string} key - The key name identifying the validator (e.g., 'host', 'x-forwarded-host').
+   * @param {(req: import('express').Request) => boolean} callback - The validation function to be added.
+   * @throws {Error} If the key is not a string.
+   * @throws {Error} If the key is "ALL".
+   * @throws {Error} If the callback is not a function.
+   * @throws {Error} If a validator with the same key already exists.
+   */
+  addDomainValidator(key, callback) {
+    if (typeof key !== 'string') throw new Error('Validator key must be a string.');
+    if (key === 'ALL')
+      throw new Error('"ALL" is a reserved keyword and cannot be used as a validator key.');
+    if (typeof callback !== 'function') throw new Error('Validator callback must be a function.');
+    if (this.#domainValidators[key]) throw new Error(`Validator with key "${key}" already exists.`);
+    this.#domainValidators[key] = callback;
+  }
+
+  /**
+   * Removes a registered domain validator by its key.
+   *
+   * Cannot remove the validator currently being used by the domain type checker,
+   * unless the type checker is set to "ALL".
+   *
+   * @param {string} key - The key name of the validator to remove.
+   * @throws {Error} If the key is not a string.
+   * @throws {Error} If no validator is found under the given key.
+   * @throws {Error} If the validator is currently in use by the domain type checker.
+   */
+  removeDomainValidator(key) {
+    if (typeof key !== 'string') throw new Error('Validator key must be a string.');
+    if (!(key in this.#domainValidators)) throw new Error(`Validator with key "${key}" not found.`);
+    if (this.#domainTypeChecker === key)
+      throw new Error(`Cannot remove validator "${key}" because it is currently in use.`);
+    delete this.#domainValidators[key];
+  }
+
+  /**
+   * Returns a shallow clone of the current domain validators map.
+   *
+   * The returned object maps each key to its corresponding validation function.
+   *
+   * @returns {{ [key: string]: (req: import('express').Request) => boolean }} A cloned object of the validators.
+   */
+  getDomainValidators() {
+    return { ...this.#domainValidators };
+  }
+
+  /**
+   * Sets the current domain validation strategy by key name.
+   *
+   * The provided key must exist in the registered domain validators,
+   * or be the string `"ALL"` to enable all validators simultaneously (not recommended).
+   *
+   * @param {string} key - The key of the validator to use (e.g., 'hostname', 'x-forwarded-host'), or 'ALL'.
+   * @throws {Error} If the key is not a string.
+   * @throws {Error} If the key is not found among the validators and is not 'ALL'.
+   */
+  setDomainTypeChecker(key) {
+    if (typeof key !== 'string') throw new Error('Domain type checker must be a string.');
+    if (key !== 'ALL' && !(key in this.#domainValidators))
+      throw new Error(`Validator key "${key}" is not registered.`);
+    this.#domainTypeChecker = key;
+  }
+
+  /**
+   * A list of standard HTTP status codes, their default messages,
+   * and some common non-official or less standard status codes.
    * Follows the format { [statusCode]: message }.
    *
    * @readonly
@@ -23,6 +203,8 @@ class TinyExpress {
     // Informational
     100: 'Continue',
     101: 'Switching Protocols',
+    102: 'Processing', // WebDAV
+    103: 'Early Hints', // RFC 8297
 
     // Successful
     200: 'OK',
@@ -32,6 +214,9 @@ class TinyExpress {
     204: 'No Content',
     205: 'Reset Content',
     206: 'Partial Content',
+    207: 'Multi-Status', // WebDAV
+    208: 'Already Reported', // WebDAV
+    226: 'IM Used', // HTTP Delta encoding
 
     // Redirection
     300: 'Multiple Choices',
@@ -42,6 +227,7 @@ class TinyExpress {
     305: 'Use Proxy',
     306: 'Unused',
     307: 'Temporary Redirect',
+    308: 'Permanent Redirect', // RFC 7538
 
     // Client Error
     400: 'Bad Request',
@@ -62,6 +248,17 @@ class TinyExpress {
     415: 'Unsupported Media Type',
     416: 'Requested Range Not Satisfiable',
     417: 'Expectation Failed',
+    418: "I'm a teapot", // RFC 2324 (April Fools)
+    421: 'Misdirected Request', // RFC 7540
+    422: 'Unprocessable Entity', // WebDAV
+    423: 'Locked', // WebDAV
+    424: 'Failed Dependency', // WebDAV
+    425: 'Too Early', // RFC 8470
+    426: 'Upgrade Required',
+    428: 'Precondition Required', // RFC 6585
+    429: 'Too Many Requests', // RFC 6585
+    431: 'Request Header Fields Too Large', // RFC 6585
+    451: 'Unavailable For Legal Reasons', // RFC 7725
 
     // Server Error
     500: 'Internal Server Error',
@@ -70,7 +267,64 @@ class TinyExpress {
     503: 'Service Unavailable',
     504: 'Gateway Timeout',
     505: 'HTTP Version Not Supported',
+    506: 'Variant Also Negotiates', // RFC 2295
+    507: 'Insufficient Storage', // WebDAV
+    508: 'Loop Detected', // WebDAV
+    510: 'Not Extended', // RFC 2774
+    511: 'Network Authentication Required', // RFC 6585
+
+    // Common but unofficial
+    520: 'Web Server Returned an Unknown Error', // Cloudflare
+    521: 'Web Server Is Down', // Cloudflare
+    522: 'Connection Timed Out', // Cloudflare
+    523: 'Origin Is Unreachable', // Cloudflare
+    524: 'A Timeout Occurred', // Cloudflare
+    525: 'SSL Handshake Failed', // Cloudflare
+    526: 'Invalid SSL Certificate', // Cloudflare
   };
+
+  /**
+   * Retrieves the HTTP status message for a given status code.
+   *
+   * @param {number|string} code - The HTTP status code to look up.
+   * @returns {string} The corresponding HTTP status message.
+   * @throws {Error} If the status code is not found.
+   */
+  getHttpStatusMessage(code) {
+    const message = this.#httpCodes[code];
+    if (typeof message !== 'string')
+      throw new Error(`HTTP status code "${code}" is not registered.`);
+    return message;
+  }
+
+  /**
+   * Checks whether a given HTTP status code is registered.
+   *
+   * @param {number|string} code - The HTTP status code to check.
+   * @returns {boolean} `true` if the status code exists, otherwise `false`.
+   */
+  hasHttpStatusMessage(code) {
+    return typeof this.#httpCodes[code] === 'string';
+  }
+
+  /**
+   * Adds a new HTTP status code and message to the list.
+   * Does not allow overwriting existing codes.
+   *
+   * @param {number|string} code - The HTTP status code to add.
+   * @param {string} message - The message associated with the code.
+   * @throws {Error} If the code already exists.
+   * @throws {Error} If the code is not a number or string.
+   * @throws {Error} If the message is not a string.
+   */
+  addHttpCode(code, message) {
+    if (typeof code !== 'number' && typeof code !== 'string')
+      throw new Error('HTTP status code must be a number or string.');
+    if (typeof message !== 'string') throw new Error('HTTP status message must be a string.');
+    if (this.#httpCodes.hasOwnProperty(code))
+      throw new Error(`HTTP status code "${code}" already exists.`);
+    this.#httpCodes[code] = message;
+  }
 
   /**
    * Sends an HTTP response with the given status code.
@@ -96,30 +350,15 @@ class TinyExpress {
     return res.status(code).end();
   }
 
-  /** @type {string[]} */
-  #domains = [];
-
   /**
-   * Creates an instance of TinyExpress.
+   * Checks whether a given host string matches a registered domain.
    *
-   * @constructor
-   * @param {ExpressApp} app
+   * This performs a strict comparison against all domains stored internally.
+   *
+   * @param {string} host - The host value to check (e.g., 'example.com').
+   * @returns {boolean} `true` if the host matches any registered domain, otherwise `false`.
    */
-  constructor(app = express()) {
-    this.app = app;
-  }
-
-  /** @param {string} domain */
-  addDomain(domain) {
-    if (typeof domain !== 'string') throw new Error('aaahh');
-    this.#domains.push(domain);
-  }
-
-  /**
-   * @param {string} host
-   * @return {boolean}
-   */
-  #validatorsExec(host) {
+  isValidDomain(host) {
     for (const domain of this.#domains) if (host === domain) return true;
     return false;
   }
@@ -134,31 +373,31 @@ class TinyExpress {
    *   [key: string]: (req: import('express').Request) => boolean
    * }}
    */
-  #validators = {
-    'x-forwarded-host': (req) => {
-      return typeof req.headers['x-forwarded-host'] === 'string'
-        ? this.#validatorsExec(req.headers['x-forwarded-host'])
-        : false;
-    },
-    hostname: (req) => {
-      return typeof req.hostname === 'string' ? this.#validatorsExec(req.hostname) : false;
-    },
-    headerHost: (req) => {
-      return typeof req.headers.host === 'string' ? this.#validatorsExec(req.headers.host) : false;
-    },
-  };
+  #domainValidators = {};
 
   /**
+   * Installs default error-handling middleware into the Express app instance.
+   *
+   * This includes:
+   * - A catch-all 404 handler that throws a `HttpError` when no routes match.
+   * - A global error handler that responds with a JSON-formatted error response,
+   *   including the stack trace in development environments.
+   *
    * @param {Object} [options={}]
    * @param {string} [options.notFoundMsg='Page not found.']
-   * @param {function(HttpStatusCode, HttpError, Request, Response): void} [options.errNext]
+   * @param {function(HttpStatusCode, HttpError, Request, Response): any} [options.errNext]
    */
   installErrors({
     notFoundMsg = 'Page not found.',
     errNext = (status, err, req, res) => {
       res.json({
         status,
-        message: err.message,
+        message:
+          typeof err.message === 'string'
+            ? err.message
+            : this.hasHttpStatusMessage(status)
+              ? this.getHttpStatusMessage(status)
+              : '',
         stack: process.env.NODE_ENV === 'development' ? err.stack : null,
       });
     },
