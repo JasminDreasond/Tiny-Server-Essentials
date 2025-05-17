@@ -1,8 +1,17 @@
 import express from 'express';
 import createHttpError from 'http-errors';
+import { extractIpList } from './Utils.mjs';
 
 /**
  * @typedef {number} HttpStatusCode
+ */
+
+/**
+ * @typedef {(req: import('express').Request) => string[]} IPExtractor
+ */
+
+/**
+ * @typedef {(req: import('express').Request) => boolean} DomainValidator
  */
 
 class TinyExpress {
@@ -16,6 +25,12 @@ class TinyExpress {
   #domains = [];
   #domainTypeChecker = 'hostname';
   #forbiddenDomainMessage = 'Forbidden domain.';
+
+  /** @type {{ [key: string]: IPExtractor }} */
+  #ipExtractors = {};
+
+  /** @type {string} */
+  #activeExtractor = 'DEFAULT';
 
   /**
    * Creates and initializes a new TinyExpress instance.
@@ -80,6 +95,99 @@ class TinyExpress {
     this.addDomainValidator('headerHost', (req) =>
       typeof req.headers.host === 'string' ? this.isValidDomain(req.headers.host) : false,
     );
+
+    this.addIpExtractor('ip', (req) => extractIpList(req.ip));
+    this.addIpExtractor('ips', (req) => extractIpList(req.ips));
+    this.addIpExtractor('remoteAddress', (req) => extractIpList(req.socket?.remoteAddress));
+    this.addIpExtractor('x-forwarded-for', (req) => extractIpList(req.headers['x-forwarded-for']));
+    this.addIpExtractor('fastly-client-ip', (req) =>
+      extractIpList(req.headers['fastly-client-ip']),
+    );
+  }
+
+  /**
+   * Registers a new IP extractor under a specific key.
+   *
+   * Each extractor must be a function that receives an Express `Request` and returns a string (IP) or null.
+   * The key `"DEFAULT"` is reserved and cannot be used directly.
+   *
+   * @param {string} key
+   * @param {IPExtractor} callback
+   * @throws {Error} If the key is invalid or already registered.
+   */
+  addIpExtractor(key, callback) {
+    if (typeof key !== 'string') throw new Error('Extractor key must be a string.');
+    if (key === 'DEFAULT') throw new Error('"DEFAULT" is a reserved keyword.');
+    if (typeof callback !== 'function') throw new Error('Extractor must be a function.');
+    if (this.#ipExtractors[key]) throw new Error(`Extractor "${key}" already exists.`);
+    this.#ipExtractors[key] = callback;
+  }
+
+  /**
+   * Removes a registered IP extractor.
+   *
+   * Cannot remove the extractor currently in use unless it's set to "DEFAULT".
+   *
+   * @param {string} key
+   * @throws {Error} If the key is invalid or in use.
+   */
+  removeIpExtractor(key) {
+    if (typeof key !== 'string') throw new Error('Extractor key must be a string.');
+    if (!(key in this.#ipExtractors)) throw new Error(`Extractor "${key}" not found.`);
+    if (this.#activeExtractor === key)
+      throw new Error(`Cannot remove extractor "${key}" because it is currently in use.`);
+    delete this.#ipExtractors[key];
+  }
+
+  /**
+   * Returns a shallow clone of the current extractors.
+   *
+   * @returns {{ [key: string]: IPExtractor }}
+   */
+  getIpExtractors() {
+    return { ...this.#ipExtractors };
+  }
+
+  /**
+   * Sets the currently active extractor key.
+   *
+   * @param {string} key
+   * @throws {Error} If the key is not found.
+   */
+  setActiveIpExtractor(key) {
+    if (key !== 'DEFAULT' && !(key in this.#ipExtractors))
+      throw new Error(`Extractor "${key}" not found.`);
+    this.#activeExtractor = key;
+  }
+
+  /**
+   * Returns the current extractor function based on the active key.
+   *
+   * @returns {IPExtractor}
+   */
+  getActiveExtractor() {
+    if (this.#activeExtractor === 'DEFAULT') {
+      // Fallback behavior (standard Express logic)
+      return (req) => {
+        const ips = [
+          ...extractIpList(req.ip),
+          ...extractIpList(req.ips),
+          ...extractIpList(req.socket?.remoteAddress),
+        ];
+        const uniqueIps = [...new Set(ips)];
+        return uniqueIps;
+      };
+    }
+    return this.#ipExtractors[this.#activeExtractor];
+  }
+
+  /**
+   * Extracts the IP address from a request using the active extractor.
+   * @param {import('express').Request} req
+   * @returns {string[]}
+   */
+  extractIp(req) {
+    return this.getActiveExtractor()(req);
   }
 
   /**
@@ -129,7 +237,7 @@ class TinyExpress {
    * The key `"ALL"` is reserved and cannot be used as a validator key.
    *
    * @param {string} key - The key name identifying the validator (e.g., 'host', 'x-forwarded-host').
-   * @param {(req: import('express').Request) => boolean} callback - The validation function to be added.
+   * @param {DomainValidator} callback - The validation function to be added.
    * @throws {Error} If the key is not a string.
    * @throws {Error} If the key is "ALL".
    * @throws {Error} If the callback is not a function.
@@ -168,7 +276,7 @@ class TinyExpress {
    *
    * The returned object maps each key to its corresponding validation function.
    *
-   * @returns {{ [key: string]: (req: import('express').Request) => boolean }} A cloned object of the validators.
+   * @returns {{ [key: string]: DomainValidator }} A cloned object of the validators.
    */
   getDomainValidators() {
     return { ...this.#domainValidators };
@@ -370,7 +478,7 @@ class TinyExpress {
    * Each associated array contains one or more callback functions that validate or extract the domain.
    *
    * @type {{
-   *   [key: string]: (req: import('express').Request) => boolean
+   *   [key: string]: DomainValidator
    * }}
    */
   #domainValidators = {};

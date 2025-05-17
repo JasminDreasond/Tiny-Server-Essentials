@@ -3,6 +3,8 @@ import TinyWeb from '../dist/index.mjs';
 const server = new TinyWeb.Express();
 
 server.app.get('/', (req, res) => {
+  console.log(req.ips, req.ip, req.socket?.remoteAddress);
+  console.log(server.extractIp(req));
   res.send('<h1>Home page</h1>');
 });
 
