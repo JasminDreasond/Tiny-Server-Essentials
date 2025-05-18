@@ -6,21 +6,33 @@ import createHttpError from 'http-errors';
 import TinyWebInstance from './Instance.mjs';
 import { extractIpList } from './Utils.mjs';
 
+/** @typedef {import('express').Request} Request */
 /**
  * @typedef {number} HttpStatusCode
  */
 
 /**
- * @typedef {(req: import('express').Request) => string[]} IPExtractor
+ * @typedef {(req: Request) => string[]} IPExtractor
  */
 
 /**
- * @typedef {(req: import('express').Request) => boolean} DomainValidator
+ * @typedef {(req: Request) => boolean} DomainValidator
+ */
+
+/**
+ * Represents the structured data extracted from an HTTP Origin header.
+ *
+ * @typedef {Object} OriginData
+ * @property {string|null} raw - The raw Origin header value.
+ * @property {string} [protocol] - The protocol used (e.g., 'http' or 'https').
+ * @property {string} [hostname] - The hostname extracted from the origin.
+ * @property {string} [port] - The port number (explicit or default based on protocol).
+ * @property {string} [full] - The full reconstructed URL from the origin.
+ * @property {string} [error] - Any parsing error encountered while processing the origin.
  */
 
 class TinyExpress {
   /** @typedef {import('express').Application} ExpressApp */
-  /** @typedef {import('express').Request} Request */
   /** @typedef {import('express').Response} Response */
   /** @typedef {import('express').NextFunction} NextFunction */
   /** @typedef {import('http-errors').HttpError} HttpError */
@@ -33,6 +45,110 @@ class TinyExpress {
 
   /** @type {string} */
   #activeExtractor = 'DEFAULT';
+
+  /**
+   * A list of domain validators using different request properties.
+   *
+   * Each property in this object represents a header or request property to check the domain against.
+   * Each associated array contains one or more callback functions that validate or extract the domain.
+   *
+   * @type {{
+   *   [key: string]: DomainValidator
+   * }}
+   */
+  #domainValidators = {};
+
+  /**
+   * A list of standard HTTP status codes, their default messages,
+   * and some common non-official or less standard status codes.
+   * Follows the format { [statusCode]: message }.
+   *
+   * @readonly
+   * @type {Object<number|string, string>}
+   */
+  #httpCodes = {
+    // Informational
+    100: 'Continue',
+    101: 'Switching Protocols',
+    102: 'Processing', // WebDAV
+    103: 'Early Hints', // RFC 8297
+
+    // Successful
+    200: 'OK',
+    201: 'Created',
+    202: 'Accepted',
+    203: 'Non-Authoritative Information',
+    204: 'No Content',
+    205: 'Reset Content',
+    206: 'Partial Content',
+    207: 'Multi-Status', // WebDAV
+    208: 'Already Reported', // WebDAV
+    226: 'IM Used', // HTTP Delta encoding
+
+    // Redirection
+    300: 'Multiple Choices',
+    301: 'Moved Permanently',
+    302: 'Found',
+    303: 'See Other',
+    304: 'Not Modified',
+    305: 'Use Proxy',
+    306: 'Unused',
+    307: 'Temporary Redirect',
+    308: 'Permanent Redirect', // RFC 7538
+
+    // Client Error
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    402: 'Payment Required',
+    403: 'Forbidden',
+    404: 'Not Found',
+    405: 'Method Not Allowed',
+    406: 'Not Acceptable',
+    407: 'Proxy Authentication Required',
+    408: 'Request Timeout',
+    409: 'Conflict',
+    410: 'Gone',
+    411: 'Length Required',
+    412: 'Precondition Failed',
+    413: 'Request Entity Too Large',
+    414: 'Request-URI Too Long',
+    415: 'Unsupported Media Type',
+    416: 'Requested Range Not Satisfiable',
+    417: 'Expectation Failed',
+    418: "I'm a teapot", // RFC 2324 (April Fools)
+    421: 'Misdirected Request', // RFC 7540
+    422: 'Unprocessable Entity', // WebDAV
+    423: 'Locked', // WebDAV
+    424: 'Failed Dependency', // WebDAV
+    425: 'Too Early', // RFC 8470
+    426: 'Upgrade Required',
+    428: 'Precondition Required', // RFC 6585
+    429: 'Too Many Requests', // RFC 6585
+    431: 'Request Header Fields Too Large', // RFC 6585
+    451: 'Unavailable For Legal Reasons', // RFC 7725
+
+    // Server Error
+    500: 'Internal Server Error',
+    501: 'Not Implemented',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+    504: 'Gateway Timeout',
+    505: 'HTTP Version Not Supported',
+    506: 'Variant Also Negotiates', // RFC 2295
+    507: 'Insufficient Storage', // WebDAV
+    508: 'Loop Detected', // WebDAV
+    510: 'Not Extended', // RFC 2774
+    511: 'Network Authentication Required', // RFC 6585
+
+    // Common but unofficial
+    520: 'Web Server Returned an Unknown Error', // Cloudflare
+    521: 'Web Server Is Down', // Cloudflare
+    522: 'Connection Timed Out', // Cloudflare
+    523: 'Origin Is Unreachable', // Cloudflare
+    524: 'A Timeout Occurred', // Cloudflare
+    525: 'SSL Handshake Failed', // Cloudflare
+    526: 'Invalid SSL Certificate', // Cloudflare
+  };
 
   /**
    * Creates and initializes a new TinyExpress instance.
@@ -159,6 +275,35 @@ class TinyExpress {
   }
 
   /**
+   * Parses the Origin header from an Express request and extracts structured information.
+   *
+   * @param {Request} req - The Express request object.
+   * @returns {OriginData} An object containing detailed parts of the origin header.
+   */
+  getOrigin(req) {
+    const raw = req.get('Origin');
+
+    /** @type {OriginData} */
+    const originInfo = {
+      raw: raw || null,
+    };
+
+    try {
+      if (raw) {
+        const url = new URL(raw);
+        originInfo.protocol = url.protocol.replace(':', '');
+        originInfo.hostname = url.hostname;
+        originInfo.port = url.port || (url.protocol === 'https:' ? '443' : '80');
+        originInfo.full = url.href;
+      }
+    } catch (err) {
+      originInfo.error = 'Invalid Origin header';
+    }
+
+    return originInfo;
+  }
+
+  /**
    * Registers a new IP extractor under a specific key.
    *
    * Each extractor must be a function that receives an Express `Request` and returns a string (IP) or null.
@@ -236,7 +381,7 @@ class TinyExpress {
 
   /**
    * Extracts the IP address from a request using the active extractor.
-   * @param {import('express').Request} req
+   * @param {Request} req
    * @returns {string[]}
    */
   extractIp(req) {
@@ -313,98 +458,6 @@ class TinyExpress {
   }
 
   /**
-   * A list of standard HTTP status codes, their default messages,
-   * and some common non-official or less standard status codes.
-   * Follows the format { [statusCode]: message }.
-   *
-   * @readonly
-   * @type {Object<number|string, string>}
-   */
-  #httpCodes = {
-    // Informational
-    100: 'Continue',
-    101: 'Switching Protocols',
-    102: 'Processing', // WebDAV
-    103: 'Early Hints', // RFC 8297
-
-    // Successful
-    200: 'OK',
-    201: 'Created',
-    202: 'Accepted',
-    203: 'Non-Authoritative Information',
-    204: 'No Content',
-    205: 'Reset Content',
-    206: 'Partial Content',
-    207: 'Multi-Status', // WebDAV
-    208: 'Already Reported', // WebDAV
-    226: 'IM Used', // HTTP Delta encoding
-
-    // Redirection
-    300: 'Multiple Choices',
-    301: 'Moved Permanently',
-    302: 'Found',
-    303: 'See Other',
-    304: 'Not Modified',
-    305: 'Use Proxy',
-    306: 'Unused',
-    307: 'Temporary Redirect',
-    308: 'Permanent Redirect', // RFC 7538
-
-    // Client Error
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    402: 'Payment Required',
-    403: 'Forbidden',
-    404: 'Not Found',
-    405: 'Method Not Allowed',
-    406: 'Not Acceptable',
-    407: 'Proxy Authentication Required',
-    408: 'Request Timeout',
-    409: 'Conflict',
-    410: 'Gone',
-    411: 'Length Required',
-    412: 'Precondition Failed',
-    413: 'Request Entity Too Large',
-    414: 'Request-URI Too Long',
-    415: 'Unsupported Media Type',
-    416: 'Requested Range Not Satisfiable',
-    417: 'Expectation Failed',
-    418: "I'm a teapot", // RFC 2324 (April Fools)
-    421: 'Misdirected Request', // RFC 7540
-    422: 'Unprocessable Entity', // WebDAV
-    423: 'Locked', // WebDAV
-    424: 'Failed Dependency', // WebDAV
-    425: 'Too Early', // RFC 8470
-    426: 'Upgrade Required',
-    428: 'Precondition Required', // RFC 6585
-    429: 'Too Many Requests', // RFC 6585
-    431: 'Request Header Fields Too Large', // RFC 6585
-    451: 'Unavailable For Legal Reasons', // RFC 7725
-
-    // Server Error
-    500: 'Internal Server Error',
-    501: 'Not Implemented',
-    502: 'Bad Gateway',
-    503: 'Service Unavailable',
-    504: 'Gateway Timeout',
-    505: 'HTTP Version Not Supported',
-    506: 'Variant Also Negotiates', // RFC 2295
-    507: 'Insufficient Storage', // WebDAV
-    508: 'Loop Detected', // WebDAV
-    510: 'Not Extended', // RFC 2774
-    511: 'Network Authentication Required', // RFC 6585
-
-    // Common but unofficial
-    520: 'Web Server Returned an Unknown Error', // Cloudflare
-    521: 'Web Server Is Down', // Cloudflare
-    522: 'Connection Timed Out', // Cloudflare
-    523: 'Origin Is Unreachable', // Cloudflare
-    524: 'A Timeout Occurred', // Cloudflare
-    525: 'SSL Handshake Failed', // Cloudflare
-    526: 'Invalid SSL Certificate', // Cloudflare
-  };
-
-  /**
    * Retrieves the HTTP status message for a given status code.
    *
    * @param {number|string} code - The HTTP status code to look up.
@@ -470,18 +523,6 @@ class TinyExpress {
     res.header(`HTTP/1.0 ${code} ${this.#httpCodes[code]}`);
     return res.status(code).end();
   }
-
-  /**
-   * A list of domain validators using different request properties.
-   *
-   * Each property in this object represents a header or request property to check the domain against.
-   * Each associated array contains one or more callback functions that validate or extract the domain.
-   *
-   * @type {{
-   *   [key: string]: DomainValidator
-   * }}
-   */
-  #domainValidators = {};
 
   /**
    * Installs default error-handling middleware into the Express app instance.

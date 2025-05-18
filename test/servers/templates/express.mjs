@@ -9,6 +9,7 @@ const insertExpress = (app, http) => {
     console.log(req.ips, req.ip, req.socket?.remoteAddress);
     console.log(req.get('User-Agent'));
     console.log(http.extractIp(req));
+    console.log(http.getOrigin(req));
     res.send('<h1>Home page</h1>');
   });
 

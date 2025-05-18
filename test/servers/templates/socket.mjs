@@ -10,12 +10,16 @@ const insertSocket = (webSocket) => {
   const io = webSocket.getRoot();
 
   io.on('connection', (socket) => {
-    console.log(socket.id);
-
     const forwarded = socket.handshake.headers['x-forwarded-for'];
     const rawAddress = socket.handshake.address;
-    const ipList = extractIpList(forwarded || rawAddress);
-    console.log('Client IPs:', ipList);
+    const remoteAddress = socket.request.socket.remoteAddress;
+
+    console.log(socket.id);
+    console.log(forwarded, rawAddress, remoteAddress);
+    console.log(webSocket.extractIp(socket));
+    console.log(webSocket.getOrigin(socket));
+
+    // console.log(req.get('User-Agent'));
   });
 };
 
