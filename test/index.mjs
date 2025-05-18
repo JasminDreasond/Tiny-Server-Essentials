@@ -1,10 +1,12 @@
 import TinyWebEssentials from '../dist/index.mjs';
-import startAllServer from "./servers/all.mjs";
-import startExpressServer from "./servers/express.mjs";
+import startAllServer from './servers/all.mjs';
+import startExpressServer from './servers/express.mjs';
+import startSocketServer from './servers/socket.mjs';
 
 const actions = {
   all: startAllServer,
   express: startExpressServer,
+  socket: startSocketServer,
 };
 
 (async () => {

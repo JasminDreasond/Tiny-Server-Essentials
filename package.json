@@ -9,6 +9,7 @@
     "test:mjs": "node test/index.mjs",
     "test:mjs:all": "node test/index.mjs all",
     "test:mjs:express": "node test/index.mjs express",
+    "test:mjs:socket": "node test/index.mjs socket",
     "fix:prettier": "npm run fix:prettier:src && npm run fix:prettier:test && npm run fix:prettier:rollup.config",
     "fix:prettier:src": "prettier --write ./src/*",
     "fix:prettier:test": "prettier --write ./test/*",

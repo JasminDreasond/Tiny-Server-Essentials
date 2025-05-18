@@ -1,5 +1,5 @@
 import { Server as HttpServer } from 'http';
-import { Server as HttpsServer } from 'https';
+import { createServer, Server as HttpsServer } from 'https';
 import { Server as SocketIOServer } from 'socket.io';
 import TinyWebInstance from './Instance.mjs';
 
@@ -24,14 +24,15 @@ class TinyIo {
   /**
    * Creates a new instance of the Socket.IO server wrapper.
    *
-   * @param {HttpServer | HttpsServer | number} server - An instance of a Node.js HTTP or HTTPS server used to bind the Socket.IO server.
-   * @param {import('socket.io').ServerOptions} options - Configuration options for the Socket.IO server instance.
+   * @param {HttpServer | HttpsServer | number} [server] - An instance of a Node.js HTTP or HTTPS server used to bind the Socket.IO server.
+   * @param {import('socket.io').ServerOptions} [options] - Configuration options for the Socket.IO server instance.
    *
    * @throws {Error} If `server` is not an instance of http.Server or https.Server.
    * @throws {Error} If `options` is not a non-null plain object.
    */
   constructor(server, options) {
     if (
+      typeof server !== 'undefined' &&
       typeof server !== 'number' &&
       !(server instanceof HttpServer) &&
       // @ts-ignore
@@ -45,8 +46,10 @@ class TinyIo {
       (typeof options !== 'object' || options === null || Array.isArray(options))
     )
       throw new Error('Expected "options" to be a non-null object');
-    // @ts-ignore
-    this.#server = server instanceof HttpServer || server instanceof HttpsServer ? server : null;
+
+    this.#server =
+      // @ts-ignore
+      server instanceof HttpServer || server instanceof HttpsServer ? server : createServer();
     this.io = new SocketIOServer(server, options);
   }
 
