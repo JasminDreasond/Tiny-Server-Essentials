@@ -7,6 +7,8 @@
     "test:js": "npx babel-node test/index.js",
     "test:cjs": "node test/index.cjs",
     "test:mjs": "node test/index.mjs",
+    "test:mjs:all": "node test/index.mjs all",
+    "test:mjs:express": "node test/index.mjs express",
     "fix:prettier": "npm run fix:prettier:src && npm run fix:prettier:test && npm run fix:prettier:rollup.config",
     "fix:prettier:src": "prettier --write ./src/*",
     "fix:prettier:test": "prettier --write ./test/*",
@@ -64,6 +66,7 @@
     "@types/express": "^5.0.1",
     "@types/http-errors": "^2.0.4",
     "express": "^5.1.0",
-    "http-errors": "^2.0.0"
+    "http-errors": "^2.0.0",
+    "socket.io": "^4.8.1"
   }
 }

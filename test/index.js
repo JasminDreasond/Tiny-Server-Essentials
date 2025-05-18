@@ -1,3 +1,3 @@
-import * as TinyEssentials from '../dist';
+import TinyWebEssentials from '../dist';
 
-console.log(TinyEssentials);
+console.log(TinyWebEssentials);

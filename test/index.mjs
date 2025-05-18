@@ -1,25 +1,21 @@
-import TinyWeb from '../dist/index.mjs';
+import TinyWebEssentials from '../dist/index.mjs';
+import startAllServer from "./servers/all.mjs";
+import startExpressServer from "./servers/express.mjs";
 
-const server = new TinyWeb.Express();
+const actions = {
+  all: startAllServer,
+  express: startExpressServer,
+};
 
-server.app.get('/', (req, res) => {
-  console.log(req.ips, req.ip, req.socket?.remoteAddress);
-  console.log(server.extractIp(req));
-  res.send('<h1>Home page</h1>');
-});
-
-server.app.get('/products', (req, res) => {
-  res.send('<h1>Products page</h1>');
-});
-
-server.app.get('/crash', (req, res) => {
-  res.send(yay);
-});
-
-server.installErrors({
-  errNext: (status, err, req, res) => server.sendHttpError(res, status),
-});
-
-server.app.listen(3050, () => {
-  console.log('Server is up on port 3050');
-});
+(async () => {
+  const arg = process.argv[2];
+  if (!arg) console.log(TinyWebEssentials);
+  // Execute args
+  if (actions[arg]) await actions[arg]();
+  // Fail
+  else {
+    console.error(`Unknown argument: ${arg}`);
+    console.error(`Valid arguments are: ${Object.keys(actions).join(', ')}`);
+    process.exit(1);
+  }
+})();

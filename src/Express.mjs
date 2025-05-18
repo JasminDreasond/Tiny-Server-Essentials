@@ -1,5 +1,9 @@
+import { createServer, Server as HttpServer } from 'http';
+import { Server as HttpsServer } from 'https';
 import express from 'express';
 import createHttpError from 'http-errors';
+
+import TinyWebInstance from './Instance.mjs';
 import { extractIpList } from './Utils.mjs';
 
 /**
@@ -21,8 +25,6 @@ class TinyExpress {
   /** @typedef {import('express').NextFunction} NextFunction */
   /** @typedef {import('http-errors').HttpError} HttpError */
 
-  /** @type {string[]} */
-  #domains = [];
   #domainTypeChecker = 'hostname';
   #forbiddenDomainMessage = 'Forbidden domain.';
 
@@ -49,8 +51,8 @@ class TinyExpress {
    *                                       If not provided, a new instance is created using `express()`.
    */
   constructor(app = express()) {
-    this.app = app;
-    this.app.use(
+    this.root = app;
+    this.root.use(
       /** @type {import('express').RequestHandler} */
       (req, res, next) => {
         const type = this.#domainTypeChecker;
@@ -77,23 +79,74 @@ class TinyExpress {
         next();
       },
     );
+  }
 
-    this.addDomain('localhost');
-    this.addDomain('127.0.0.1');
-    this.addDomain('::1');
+  /**
+   * Returns the current TinyWeb instance.
+   *
+   * @returns {TinyWebInstance} The active Http server.
+   */
+  getWeb() {
+    if (!(this.web instanceof TinyWebInstance))
+      throw new Error('this.web expects an instance of TinyWebInstance.');
+    return this.web;
+  }
+
+  /**
+   * Returns the current Http server instance.
+   *
+   * @returns {HttpServer | HttpsServer} The active Http server.
+   */
+  getServer() {
+    return this.getWeb().getServer();
+  }
+
+  /**
+   * Returns the Express app instance.
+   *
+   * @returns {import('express').Application} Express application instance.
+   */
+  getRoot() {
+    return this.root;
+  }
+
+  /**
+   * Init instance.
+   *
+   * @param {TinyWebInstance|HttpServer|HttpsServer} [web=new TinyWebInstance()] - An instance of TinyWebInstance.
+   *
+   * @throws {Error} If `web` is not an instance of TinyWebInstance.
+   */
+  init(web = new TinyWebInstance(createServer(this.root))) {
+    if (
+      !(web instanceof TinyWebInstance) &&
+      // @ts-ignore
+      !(web instanceof HttpServer) &&
+      // @ts-ignore
+      !(web instanceof HttpsServer)
+    )
+      throw new Error('init expects an instance of TinyWebInstance, HttpServer, or HttpsServer.');
+
+    /** @type {TinyWebInstance} */ this.web;
+    if (web instanceof TinyWebInstance) this.web = web;
+    else this.web = new TinyWebInstance(web);
+
+    if (!this.web.hasDomain('localhost')) this.web.addDomain('localhost');
+    if (!this.web.hasDomain('127.0.0.1')) this.web.addDomain('127.0.0.1');
+    if (!this.web.hasDomain('::1')) this.web.addDomain('::1');
 
     this.addDomainValidator('x-forwarded-host', (req) =>
       typeof req.headers['x-forwarded-host'] === 'string'
-        ? this.isValidDomain(req.headers['x-forwarded-host'])
+        ? this.web.hasDomain(req.headers['x-forwarded-host'])
         : false,
     );
 
     this.addDomainValidator('hostname', (req) =>
-      typeof req.hostname === 'string' ? this.isValidDomain(req.hostname) : false,
+      typeof req.hostname === 'string' ? this.web.hasDomain(req.hostname) : false,
     );
 
     this.addDomainValidator('headerHost', (req) =>
-      typeof req.headers.host === 'string' ? this.isValidDomain(req.headers.host) : false,
+      typeof req.headers.host === 'string' ? this.web.hasDomain(req.headers.host) : false,
     );
 
     this.addIpExtractor('ip', (req) => extractIpList(req.ip));
@@ -188,46 +241,6 @@ class TinyExpress {
    */
   extractIp(req) {
     return this.getActiveExtractor()(req);
-  }
-
-  /**
-   * Registers a domain string into the internal domain list.
-   *
-   * This can be used for domain-based routing, validation, or matching logic.
-   *
-   * @param {string} domain - The domain name to be registered (e.g., 'example.com').
-   * @throws {Error} If the domain is not a string.
-   */
-  addDomain(domain) {
-    if (typeof domain !== 'string') throw new Error('aaahh');
-    this.#domains.push(domain);
-  }
-
-  /**
-   * Removes a domain string from the internal domain list.
-   *
-   * Throws an error if the domain is not registered.
-   *
-   * @param {string} domain - The domain name to be removed (e.g., 'example.com').
-   * @throws {Error} If the domain is not a string.
-   * @throws {Error} If the domain is not found in the list.
-   */
-  removeDomain(domain) {
-    if (typeof domain !== 'string') throw new Error('Domain must be a string.');
-    const index = this.#domains.indexOf(domain);
-    if (index === -1) throw new Error(`Domain "${domain}" not found.`);
-    this.#domains.splice(index, 1);
-  }
-
-  /**
-   * Returns a shallow clone of the internal domain list.
-   *
-   * This ensures the original list remains immutable from the outside.
-   *
-   * @returns {string[]} A cloned array containing all registered domain names.
-   */
-  getDomains() {
-    return [...this.#domains];
   }
 
   /**
@@ -448,27 +461,14 @@ class TinyExpress {
    */
   sendHttpError(res, code) {
     if (!res || typeof res.status !== 'function' || typeof res.send !== 'function')
-      throw new TypeError('Expected a valid Express Response object as the first argument');
+      throw new Error('Expected a valid Express Response object as the first argument');
     if (typeof code !== 'number' || !Number.isInteger(code))
-      throw new TypeError('Expected an integer HTTP status code as the second argument');
+      throw new Error('Expected an integer HTTP status code as the second argument');
     const statusText = this.#httpCodes?.[code];
     if (typeof statusText !== 'string') throw new Error(`Unknown HTTP status code: ${code}`);
 
     res.header(`HTTP/1.0 ${code} ${this.#httpCodes[code]}`);
     return res.status(code).end();
-  }
-
-  /**
-   * Checks whether a given host string matches a registered domain.
-   *
-   * This performs a strict comparison against all domains stored internally.
-   *
-   * @param {string} host - The host value to check (e.g., 'example.com').
-   * @returns {boolean} `true` if the host matches any registered domain, otherwise `false`.
-   */
-  isValidDomain(host) {
-    for (const domain of this.#domains) if (host === domain) return true;
-    return false;
   }
 
   /**
@@ -510,8 +510,9 @@ class TinyExpress {
       });
     },
   } = {}) {
+    const app = this.getRoot();
     // Middleware 404
-    this.app.use(
+    app.use(
       /** @type {function(Request, Response, NextFunction): void} */ (req, res, next) => {
         const err = createHttpError(404, notFoundMsg);
         next(err);
@@ -519,7 +520,7 @@ class TinyExpress {
     );
 
     // Middleware global de erro
-    this.app.use(
+    app.use(
       /** @type {function(HttpError, Request, Response, NextFunction): void} */
       (err, req, res, next) => {
         const status = err.status || err.statusCode || 500;
