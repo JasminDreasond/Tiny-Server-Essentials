@@ -33,7 +33,7 @@ class TinyIo {
   /** @type {HttpServer|HttpsServer|null} */
   #server = null;
 
-  #domainTypeChecker = 'hostname';
+  #domainTypeChecker = 'headerHost';
   #forbiddenDomainMessage = 'Forbidden domain.';
 
   /** @type {{ [key: string]: IPExtractor }} */
@@ -100,11 +100,39 @@ class TinyIo {
       throw new Error('Expected "options" to be a non-null object');
 
     this.#server = server instanceof HttpServer || server instanceof HttpsServer ? server : null;
-    this.io = new SocketIOServer(
+    this.root = new SocketIOServer(
       this.#server || server || ops,
       this.#server || server ? ops : undefined,
     );
     if (!this.#server) this.#server = createServer();
+
+    this.root.on(
+      'connection',
+      /** @type {Socket} */
+      (socket) => {
+        const type = this.#domainTypeChecker;
+        let valid = false;
+        if (type === 'ALL') {
+          const validators = Object.values(this.#domainValidators);
+          for (const validator of validators) {
+            if (typeof validator !== 'function')
+              throw new Error(`Domain validator "${type}" is not registered.`);
+            valid = validator(socket);
+            if (valid) break;
+          }
+        } else {
+          const validator = this.#domainValidators[type];
+          if (typeof validator !== 'function')
+            throw new Error(`Domain validator "${type}" is not registered.`);
+          valid = validator(socket);
+        }
+        if (!valid) {
+          socket.emit('force_disconnect', { reason: this.#forbiddenDomainMessage });
+          socket.disconnect(true);
+          return;
+        }
+      },
+    );
   }
 
   /**
@@ -203,7 +231,7 @@ class TinyIo {
    * @returns {import('socket.io').Server} The active Socket.IO server.
    */
   getRoot() {
-    return this.io;
+    return this.root;
   }
 
   /**

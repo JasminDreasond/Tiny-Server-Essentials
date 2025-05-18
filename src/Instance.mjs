@@ -83,15 +83,40 @@ class TinyWebInstance {
   }
 
   /**
+   * Removes the port number from an IPv4, IPv6, or hostname.
+   *
+   * @param {string} host - The raw host string possibly including a port.
+   * @returns {string} The host string without any port.
+   */
+  stripPort(host) {
+    // IPv6 with port: [2001:db8::1]:443 -> [2001:db8::1]
+    if (host.startsWith('[')) {
+      const idx = host.indexOf(']');
+      if (idx !== -1) return host.slice(0, idx + 1);
+    }
+
+    // Hostname or IPv4 with port: example.com:8080 or 192.168.0.1:3000
+    const idx = host.indexOf(':');
+    if (idx !== -1 && host.indexOf(':', idx + 1) === -1) {
+      return host.slice(0, idx);
+    }
+
+    return host;
+  }
+
+  /**
    * Checks whether a given host string matches a registered domain.
    *
    * This performs a strict comparison against all domains stored internally.
    *
-   * @param {string} host - The host value to check (e.g., 'example.com').
+   * @param {string} host - The host value to check (e.g., 'example.com', '192.168.0.1:8080').
    * @returns {boolean} `true` if the host matches any registered domain, otherwise `false`.
    */
   hasDomain(host) {
-    for (const domain of this.#domains) if (host === domain) return true;
+    const cleanHost = this.stripPort(host);
+    for (const domain of this.#domains) {
+      if (cleanHost === domain) return true;
+    }
     return false;
   }
 }
