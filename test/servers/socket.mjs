@@ -3,7 +3,7 @@ import insertSocket from './templates/socket.mjs';
 
 const startSocketServer = () => {
   // Start Socket Io
-  const webSocket = new TinyWeb.Io();
+  const webSocket = new TinyWeb.Io({ cors: { origin: '*' } });
   webSocket.init();
 
   // Start socket io

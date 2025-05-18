@@ -10,7 +10,8 @@ const startAllServer = () => {
   const main = http.getServer();
 
   // Start Socket Io
-  const webSocket = new TinyWeb.Io(main);
+  const webSocket = new TinyWeb.Io(main, { cors: { origin: '*' } });
+
   webSocket.init(http.getWeb());
 
   // Insert Express router

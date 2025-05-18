@@ -24,33 +24,40 @@ class TinyIo {
   /**
    * Creates a new instance of the Socket.IO server wrapper.
    *
-   * @param {HttpServer | HttpsServer | number} [server] - An instance of a Node.js HTTP or HTTPS server used to bind the Socket.IO server.
+   * @param {HttpServer | HttpsServer | number | import('socket.io').ServerOptions} [server] - An instance of a Node.js HTTP/HTTPS server, a port number, or Socket.IO options.
    * @param {import('socket.io').ServerOptions} [options] - Configuration options for the Socket.IO server instance.
    *
-   * @throws {Error} If `server` is not an instance of http.Server or https.Server.
+   * @throws {Error} If `server` is not a valid server, number, or object.
    * @throws {Error} If `options` is not a non-null plain object.
    */
   constructor(server, options) {
-    if (
-      typeof server !== 'undefined' &&
-      typeof server !== 'number' &&
-      !(server instanceof HttpServer) &&
-      // @ts-ignore
-      !(server instanceof HttpsServer)
-    )
+    const isServerInstance = server instanceof HttpServer || server instanceof HttpsServer;
+    const isNumber = typeof server === 'number';
+    const isPlainObject =
+      typeof server === 'object' && server !== null && !Array.isArray(server) && !isServerInstance;
+
+    /** @type {import('socket.io').ServerOptions} */
+    // @ts-ignore
+    const ops = isPlainObject && typeof options === 'undefined' ? server : options;
+    if (isPlainObject && typeof options === 'undefined') server = undefined;
+
+    if (typeof server !== 'undefined' && !isNumber && !isServerInstance)
       throw new Error(
-        'Expected "server" to be an instance of http.Server, https.Server, or number',
+        'Expected "server" to be an instance of http.Server, https.Server, number, or plain options object',
       );
+
     if (
-      typeof options !== 'undefined' &&
-      (typeof options !== 'object' || options === null || Array.isArray(options))
+      typeof ops !== 'undefined' &&
+      (typeof ops !== 'object' || ops === null || Array.isArray(ops))
     )
       throw new Error('Expected "options" to be a non-null object');
 
-    this.#server =
-      // @ts-ignore
-      server instanceof HttpServer || server instanceof HttpsServer ? server : createServer();
-    this.io = new SocketIOServer(server, options);
+    this.#server = server instanceof HttpServer || server instanceof HttpsServer ? server : null;
+    this.io = new SocketIOServer(
+      this.#server || server || ops,
+      this.#server || server ? ops : undefined,
+    );
+    if (!this.#server) this.#server = createServer();
   }
 
   /**
