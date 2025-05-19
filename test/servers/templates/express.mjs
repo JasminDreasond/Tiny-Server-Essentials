@@ -19,11 +19,19 @@ const insertExpress = (app, http) => {
 
     console.log(req.body);
 
-    res.send('<h1>Home page</h1>');
+    res.send('<h1>Home page</h1><h2><a href="./pudding.txt" target="_blank">Pudding! :3</a></h2>');
   });
 
   app.get('/products', (req, res) => {
     res.send('<h1>Products page</h1>');
+  });
+
+  app.get('/pudding.txt', (req, res) => {
+    http.sendFile(res, {
+      file: Buffer.from('Pudding! :3', 'utf-8'),
+      lastModified: new Date(),
+      contentType: 'text/plain',
+    });
   });
 
   app.get('/crash', (req, res) => {

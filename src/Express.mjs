@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { createServer, Server as HttpServer } from 'http';
 import { Server as HttpsServer } from 'https';
 import express from 'express';
@@ -569,6 +570,70 @@ class TinyExpress {
         errNext(status, err, req, res);
       },
     );
+  }
+
+  /**
+   * Sends a file response with appropriate headers.
+   *
+   * @param {Response} res - The HTTP response object.
+   * @param {Object} [options={}]
+   * @param {string} [options.contentType='text/plain']
+   * @param {number} [options.fileMaxAge=0]
+   * @param {Buffer} [options.file]
+   * @param {Date | number | string} [options.lastModified]
+   * @param {string | null} [options.fileName]
+   * @throws {Error} If required options are missing or invalid.
+   * @beta
+   */
+  sendFile(
+    res,
+    { contentType = 'text/plain', fileMaxAge = 0, file, lastModified, fileName = null } = {},
+  ) {
+    if (!Buffer.isBuffer(file)) throw new Error('"file" must be a Buffer instance.');
+    if (!Number.isInteger(fileMaxAge) || fileMaxAge < 0)
+      throw new Error('"fileMaxAge" must be a non-negative integer.');
+    if (typeof fileName !== 'string' && fileName !== null)
+      throw new Error('"fileName" must be a string.');
+    if (
+      typeof lastModified !== 'string' &&
+      typeof lastModified !== 'number' &&
+      !(lastModified instanceof Date)
+    )
+      throw new Error('"lastModified" is not a valid date value.');
+
+    // File Type Headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    // Content-MD5 Header
+    res.setHeader('Content-MD5', createHash('md5').update(file).digest('base64'));
+
+    // Last-Modified Header
+    if (
+      typeof lastModified === 'string' ||
+      typeof lastModified === 'number' ||
+      lastModified instanceof Date
+    ) {
+      const date = new Date(lastModified);
+      if (!Number.isNaN(date.getTime())) res.setHeader('Last-Modified', date.toUTCString());
+    }
+
+    // Cache Control Headers
+    const expires = new Date(Date.now() + fileMaxAge);
+    res.setHeader('Expires', expires.toUTCString());
+    res.setHeader('Cache-Control', `public, max-age=${fileMaxAge}`);
+
+    // Content Length
+    const byteLength = file.byteLength;
+    if (!Number.isInteger(byteLength) || byteLength < 0)
+      throw new Error('Failed to determine valid file length.');
+    res.setHeader('Content-Length', byteLength);
+
+    if (typeof fileName === 'string')
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    // Send Response
+    res.send(file);
   }
 }
 
