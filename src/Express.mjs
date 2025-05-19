@@ -1,3 +1,5 @@
+import fs from 'fs';
+import { Readable as ReadableStream } from 'stream';
 import { createHash } from 'crypto';
 import { createServer, Server as HttpServer } from 'http';
 import { Server as HttpsServer } from 'https';
@@ -696,6 +698,96 @@ class TinyExpress {
 
     // Send Response
     res.send(file);
+  }
+
+  /**
+   * Streams a file response with support for range headers (video/audio streaming).
+   *
+   * @param {Request} req - The HTTP request object.
+   * @param {Response} res - The HTTP response object.
+   * @param {Object} [options={}]
+   * @param {string} [options.filePath] - The absolute file path to stream.
+   * @param {ReadableStream} [options.stream] - A readable stream to use instead of filePath.
+   * @param {string} [options.contentType='application/octet-stream']
+   * @param {number} [options.fileMaxAge=0]
+   * @param {Date | number | string | null} [options.lastModified]
+   * @param {string | null} [options.fileName]
+   * @beta
+   */
+  streamFile(
+    req,
+    res,
+    {
+      filePath,
+      stream,
+      contentType = 'application/octet-stream',
+      fileMaxAge = 0,
+      lastModified = null,
+      fileName = null,
+    } = {},
+  ) {
+    const range = req.headers.range;
+    let total = 0;
+    let stat = null;
+
+    if (filePath) {
+      if (typeof filePath !== 'string')
+        throw new Error('"filePath" must be a valid file path string.');
+
+      if (!fs.existsSync(filePath)) throw new Error(`File "${filePath}" not found.`);
+
+      stat = fs.statSync(filePath);
+      total = stat.size;
+    } else if (!(stream instanceof ReadableStream))
+      throw new Error('Either "filePath" or "stream" must be provided.');
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    // Last-Modified
+    const lastModDate = new Date(lastModified || stat?.mtime || Date.now());
+    res.setHeader('Last-Modified', lastModDate.toUTCString());
+
+    // Cache headers
+    const expires = new Date(Date.now() + fileMaxAge);
+    res.setHeader('Expires', expires.toUTCString());
+    res.setHeader(
+      'Cache-Control',
+      fileMaxAge > 0 ? `public, max-age=${fileMaxAge}` : 'no-cache, no-store, must-revalidate',
+    );
+
+    if (fileMaxAge === 0) res.setHeader('Pragma', 'no-cache');
+    if (typeof fileName === 'string')
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+
+    // --- RANGE SUPPORT ONLY IF filePath is available ---
+    if (range && filePath) {
+      const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(startStr, 10);
+      const end = endStr ? parseInt(endStr, 10) : total - 1;
+
+      if (Number.isNaN(start) || Number.isNaN(end) || start > end || end >= total) {
+        res.status(416).setHeader('Content-Range', `bytes */${total}`).end();
+        return;
+      }
+
+      const chunkSize = end - start + 1;
+      res.status(206); // Partial Content
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+      res.setHeader('Content-Length', chunkSize);
+
+      const partialStream = fs.createReadStream(filePath, { start, end });
+      partialStream.pipe(res);
+    } else {
+      if (filePath) {
+        res.setHeader('Content-Length', total);
+        const fullStream = fs.createReadStream(filePath);
+        fullStream.pipe(res);
+      } else if (stream instanceof ReadableStream) {
+        // Using provided stream
+        stream.pipe(res);
+      } else throw new Error('Either "stream" must be provided.');
+    }
   }
 }
 

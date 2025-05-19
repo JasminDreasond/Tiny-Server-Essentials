@@ -1,6 +1,14 @@
+import fs from 'fs';
+import path from 'path';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import TinyExpress from '../../../dist/Express.mjs';
+
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * @param {import('express').Application} app
@@ -44,6 +52,24 @@ const insertExpress = (app, http) => {
       { login: 'jasmindreasond', password: 'pudding' },
     ),
   );
+
+  app.get('/media/:filename', (req, res) => {
+    const tempPath = path.resolve(__dirname, 'temp');
+    const filePath = path.resolve(tempPath, req.params.filename);
+    if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
+
+    try {
+      http.streamFile(req, res, {
+        filePath,
+        contentType: 'audio/mpeg', // ou 'video/mp4'
+        fileMaxAge: 3600, // 1h
+        fileName: req.params.filename,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
+  });
 
   app.get('/crash', (req, res) => {
     res.send(yay);
