@@ -37,6 +37,8 @@ class TinyExpress {
   /** @typedef {import('express').Response} Response */
   /** @typedef {import('express').NextFunction} NextFunction */
   /** @typedef {import('http-errors').HttpError} HttpError */
+  /** @typedef {import('express').RequestHandler} RequestHandler */
+  /** @typedef {import('express').ErrorRequestHandler} ErrorRequestHandler */
 
   #domainTypeChecker = 'hostname';
   #forbiddenDomainMessage = 'Forbidden domain.';
@@ -170,7 +172,7 @@ class TinyExpress {
   constructor(app = express()) {
     this.root = app;
     this.root.use(
-      /** @type {import('express').RequestHandler} */
+      /** @type {RequestHandler} */
       (req, res, next) => {
         const type = this.#domainTypeChecker;
         let valid = false;
@@ -555,7 +557,7 @@ class TinyExpress {
     const app = this.getRoot();
     // Middleware 404
     app.use(
-      /** @type {function(Request, Response, NextFunction): void} */ (req, res, next) => {
+      /** @type {RequestHandler} */ (req, res, next) => {
         const err = createHttpError(404, notFoundMsg);
         next(err);
       },
@@ -563,13 +565,62 @@ class TinyExpress {
 
     // Middleware global de erro
     app.use(
-      /** @type {function(HttpError, Request, Response, NextFunction): void} */
+      /** @type {ErrorRequestHandler} */
       (err, req, res, next) => {
         const status = err.status || err.statusCode || 500;
         res.status(status);
         errNext(status, err, req, res);
       },
     );
+  }
+
+  /**
+   * Express middleware for basic HTTP authentication.
+   *
+   * Validates the `Authorization` header against provided login credentials.
+   * If credentials match, the request proceeds to the next middleware.
+   * Otherwise, responds with HTTP 401 Unauthorized.
+   *
+   * @param {Request} req - Express request object.
+   * @param {Response} res - Express response object.
+   * @param {NextFunction} next - Express next middleware function.
+   * @param {Object} [options={}] - Optional configuration object.
+   * @param {string} [options.login] - Expected username for authentication.
+   * @param {string} [options.password] - Expected password for authentication.
+   * @param {RequestHandler|null} [options.nextError] - Optional error handler middleware called on failed auth.
+   * @param {(login: string, password: string) => boolean|Promise<boolean>} [options.validator] - Optional function to validate credentials.
+   */
+  async authRequest(
+    req,
+    res,
+    next,
+    { login = '', password = '', nextError = null, validator } = {},
+  ) {
+    // authentication middleware
+    const auth = { login, password };
+
+    // Parse credentials from Authorization header
+    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+    const [authLogin, authPassword] = Buffer.from(b64auth, 'base64').toString().split(':');
+
+    // Custom validator or static comparison
+    const valid =
+      typeof validator === 'function'
+        ? await validator(authLogin, authPassword)
+        : authLogin === auth.login && authPassword === auth.password;
+
+    if (authLogin && authPassword && valid) {
+      return next(); // Access granted
+    }
+
+    // Access denied
+    res.set('WWW-Authenticate', 'Basic realm="401"');
+    if (typeof nextError === 'function') {
+      res.status(401);
+      nextError(req, res, next);
+      return;
+    }
+    res.status(401).end();
   }
 
   /**

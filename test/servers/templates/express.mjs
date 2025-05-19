@@ -34,6 +34,17 @@ const insertExpress = (app, http) => {
     });
   });
 
+  app.get('/auth', (req, res) =>
+    http.authRequest(
+      req,
+      res,
+      () => {
+        res.send('Yay! Tiny auth! :3');
+      },
+      { login: 'jasmindreasond', password: 'pudding' },
+    ),
+  );
+
   app.get('/crash', (req, res) => {
     res.send(yay);
   });
