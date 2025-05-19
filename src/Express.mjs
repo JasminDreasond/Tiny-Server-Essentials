@@ -580,7 +580,7 @@ class TinyExpress {
    * @param {string} [options.contentType='text/plain']
    * @param {number} [options.fileMaxAge=0]
    * @param {Buffer} [options.file]
-   * @param {Date | number | string} [options.lastModified]
+   * @param {Date | number | string | null} [options.lastModified]
    * @param {string | null} [options.fileName]
    * @throws {Error} If required options are missing or invalid.
    * @beta
@@ -595,6 +595,7 @@ class TinyExpress {
     if (typeof fileName !== 'string' && fileName !== null)
       throw new Error('"fileName" must be a string.');
     if (
+      lastModified !== null &&
       typeof lastModified !== 'string' &&
       typeof lastModified !== 'number' &&
       !(lastModified instanceof Date)
@@ -618,10 +619,20 @@ class TinyExpress {
       if (!Number.isNaN(date.getTime())) res.setHeader('Last-Modified', date.toUTCString());
     }
 
+    // ETag Header (weak ETag based on MD5 hash)
+    const etag = `"${createHash('md5').update(file).digest('hex')}"`;
+    res.setHeader('ETag', etag);
+
     // Cache Control Headers
     const expires = new Date(Date.now() + fileMaxAge);
     res.setHeader('Expires', expires.toUTCString());
     res.setHeader('Cache-Control', `public, max-age=${fileMaxAge}`);
+
+    // Pragma header (legacy)
+    if (fileMaxAge === 0) {
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
 
     // Content Length
     const byteLength = file.byteLength;
