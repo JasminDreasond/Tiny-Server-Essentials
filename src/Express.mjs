@@ -628,13 +628,16 @@ class TinyExpress {
   /**
    * Sends a file response with appropriate headers.
    *
-   * @param {Response} res - The HTTP response object.
-   * @param {Object} [options={}]
-   * @param {string} [options.contentType='text/plain']
-   * @param {number} [options.fileMaxAge=0]
-   * @param {Buffer} [options.file]
-   * @param {Date | number | string | null} [options.lastModified]
-   * @param {string | null} [options.fileName]
+   * This function sends a file (as a Buffer) directly in the HTTP response,
+   * setting standard headers such as Content-Type, Cache-Control, Last-Modified, and Content-Disposition.
+   *
+   * @param {Response} res - The HTTP response object to send the file through.
+   * @param {Object} [options={}] - Configuration options for the file response.
+   * @param {string} [options.contentType='text/plain'] - The MIME type of the file being sent.
+   * @param {number} [options.fileMaxAge=0] - Max age in seconds for the Cache-Control header.
+   * @param {Buffer} [options.file] - The file contents to send as a buffer. Required.
+   * @param {Date | number | string | null} [options.lastModified] - The last modification time for the Last-Modified header.
+   * @param {string | null} [options.fileName] - Optional file name for the Content-Disposition header.
    * @throws {Error} If required options are missing or invalid.
    * @beta
    */
@@ -703,15 +706,18 @@ class TinyExpress {
   /**
    * Streams a file response with support for range headers (video/audio streaming).
    *
-   * @param {Request} req - The HTTP request object.
-   * @param {Response} res - The HTTP response object.
-   * @param {Object} [options={}]
-   * @param {string} [options.filePath] - The absolute file path to stream.
-   * @param {ReadableStream} [options.stream] - A readable stream to use instead of filePath.
-   * @param {string} [options.contentType='application/octet-stream']
-   * @param {number} [options.fileMaxAge=0]
-   * @param {Date | number | string | null} [options.lastModified]
-   * @param {string | null} [options.fileName]
+   * This function streams a file or provided readable stream to the client, supporting HTTP range requests.
+   * It is useful for serving large media files where partial content responses are required.
+   *
+   * @param {Request} req - The HTTP request object, used to detect range headers.
+   * @param {Response} res - The HTTP response object to stream the file through.
+   * @param {Object} [options={}] - Configuration options for streaming.
+   * @param {string} [options.filePath] - The absolute file path to stream. Required if no stream is provided.
+   * @param {ReadableStream} [options.stream] - A readable stream to use instead of reading from filePath.
+   * @param {string} [options.contentType='application/octet-stream'] - The MIME type of the streamed content.
+   * @param {number} [options.fileMaxAge=0] - Max age in seconds for the Cache-Control header.
+   * @param {Date | number | string | null} [options.lastModified] - The last modification time for the Last-Modified header.
+   * @param {string | null} [options.fileName] - Optional file name for the Content-Disposition header.
    * @beta
    */
   streamFile(
