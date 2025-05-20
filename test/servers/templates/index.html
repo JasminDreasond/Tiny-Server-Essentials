@@ -16,7 +16,10 @@
 
     <script>
       const socket = io('http://localhost:3050');
-      const manager = new TinyStreamManager(socket);
+      const manager = new TinyStreamManager();
+      manager.on('mic', (data, metadata) => socket.emit('mic', data, { time: Date.now() }));
+      manager.on('cam', (data, metadata) => socket.emit('cam', data, { time: Date.now() }));
+      manager.on('screen', (data, metadata) => socket.emit('screen', data, { time: Date.now() }));
 
       async function getDevices() {
         await manager.updateDeviceList();
@@ -52,10 +55,6 @@
         console.table(manager.getDevicesByKind('audio'));
         console.table(manager.getDevicesByKind('video'));
         console.table(manager.getDevicesByKind('speaker'));
-
-        manager.sendMicStream('mic');
-        manager.sendCamStream('cam');
-        manager.sendScreenStream('screen');
       }
 
       document.getElementById('active-stream').addEventListener('click', () => startAll());

@@ -1,11 +1,143 @@
+import { EventEmitter } from 'events';
 import { TinyPromiseQueue } from 'tiny-essentials';
 import { VolumeMeter } from './VolumeMeter.mjs';
 
-/** @typedef {import('socket.io').Socket} Socket */
+/**
+ * @typedef {Object} StreamConfig
+ * @property {string} mimeType - A valid MIME type for MediaRecorder.
+ * @property {number} timeslice - Interval in milliseconds for emitting data chunks.
+ */
 
 export class TinyStreamManager {
   #loadingDevices = false;
   #queue = new TinyPromiseQueue();
+
+  /**
+   * Important instance used to make event emitter.
+   * @type {EventEmitter}
+   */
+  #events = new EventEmitter();
+
+  /**
+   * Important instance used to make system event emitter.
+   * @type {EventEmitter}
+   */
+  #sysEvents = new EventEmitter();
+  #sysEventsUsed = false;
+
+  /**
+   * Emits an event with optional arguments to all system emit.
+   * @param {string | symbol} event - The name of the event to emit.
+   * @param {...any} args - Arguments passed to event listeners.
+   */
+  #emit(event, ...args) {
+    this.#events.emit(event, ...args);
+    if (this.#sysEventsUsed) this.#sysEvents.emit(event, ...args);
+  }
+
+  /**
+   * Provides access to a secure internal EventEmitter for subclass use only.
+   *
+   * This method exposes a dedicated EventEmitter instance intended specifically for subclasses
+   * that extend the main class. It prevents subclasses from accidentally or intentionally using
+   * the primary class's public event system (`emit`), which could lead to unpredictable behavior
+   * or interference in the base class's event flow.
+   *
+   * For security and consistency, this method is designed to be accessed only once.
+   * Multiple accesses are blocked to avoid leaks or misuse of the internal event bus.
+   *
+   * @returns {EventEmitter} A special internal EventEmitter instance for subclass use.
+   * @throws {Error} If the method is called more than once.
+   */
+  getSysEvents() {
+    if (this.#sysEventsUsed)
+      throw new Error(
+        'Access denied: getSysEvents() can only be called once. ' +
+          'This restriction ensures subclass event isolation and prevents accidental interference ' +
+          'with the main class event emitter.',
+      );
+    this.#sysEventsUsed = true;
+    return this.#sysEvents;
+  }
+
+  /**
+   * @typedef {(...args: any[]) => void} ListenerCallback
+   * A generic callback function used for event listeners.
+   */
+
+  /**
+   * Sets the maximum number of listeners for the internal event emitter.
+   *
+   * @param {number} max - The maximum number of listeners allowed.
+   */
+  setMaxListeners(max) {
+    this.#events.setMaxListeners(max);
+  }
+
+  /**
+   * Emits an event with optional arguments.
+   * @param {string | symbol} event - The name of the event to emit.
+   * @param {...any} args - Arguments passed to event listeners.
+   * @returns {boolean} `true` if the event had listeners, `false` otherwise.
+   */
+  emit(event, ...args) {
+    return this.#events.emit(event, ...args);
+  }
+
+  /**
+   * Registers a listener for the specified event.
+   * @param {string | symbol} event - The name of the event to listen for.
+   * @param {ListenerCallback} listener - The callback function to invoke.
+   * @returns {this} The current class instance (for chaining).
+   */
+  on(event, listener) {
+    this.#events.on(event, listener);
+    return this;
+  }
+
+  /**
+   * Registers a one-time listener for the specified event.
+   * @param {string | symbol} event - The name of the event to listen for once.
+   * @param {ListenerCallback} listener - The callback function to invoke.
+   * @returns {this} The current class instance (for chaining).
+   */
+  once(event, listener) {
+    this.#events.once(event, listener);
+    return this;
+  }
+
+  /**
+   * Removes a listener from the specified event.
+   * @param {string | symbol} event - The name of the event.
+   * @param {ListenerCallback} listener - The listener to remove.
+   * @returns {this} The current class instance (for chaining).
+   */
+  off(event, listener) {
+    this.#events.off(event, listener);
+    return this;
+  }
+
+  /**
+   * Alias for `on`.
+   * @param {string | symbol} event - The name of the event.
+   * @param {ListenerCallback} listener - The callback to register.
+   * @returns {this} The current class instance (for chaining).
+   */
+  addListener(event, listener) {
+    this.#events.addListener(event, listener);
+    return this;
+  }
+
+  /**
+   * Alias for `off`.
+   * @param {string | symbol} event - The name of the event.
+   * @param {ListenerCallback} listener - The listener to remove.
+   * @returns {this} The current class instance (for chaining).
+   */
+  removeListener(event, listener) {
+    this.#events.removeListener(event, listener);
+    return this;
+  }
 
   /**
    * @type {{
@@ -33,6 +165,132 @@ export class TinyStreamManager {
   screenStream = null;
   /** @type {Map<string, MediaRecorder>} */
   #recorders = new Map();
+
+  /**
+   * Interval ID returned by setInterval, used to clear the interval later.
+   * @type {NodeJS.Timeout | null}
+   */
+  #monitorIntervalId = null;
+
+  /**
+   * Starts the interval that monitors volume meters for mic and screen.
+   *
+   * This function sets up a `setInterval` that continuously reads audio volume
+   * from active meters (if any), calculates a percentage level, and emits
+   * events like `'micMeter'` and `'screenMeter'` with detailed volume info.
+   *
+   * It will not create a new interval if one is already running, or if no meters are active.
+   */
+  #startMonitorInterval() {
+    if (!this.#monitorIntervalId && (this.hasMicMeter() || this.hasScreenMeter())) {
+      this.#monitorIntervalId = setInterval(() => {
+        /**
+         * @param {string} eventName
+         * @param {VolumeMeter} audio
+         */
+        const emitData = (eventName, audio) => {
+          let perc = audio.volume * 1000;
+          perc = perc < 100 ? (perc > 0 ? perc : 0) : 100;
+          this.#emit(eventName, { audio, perc: 100 - perc, vol: audio.volume });
+        };
+
+        if (this.hasMicMeter()) emitData('micMeter', this.getMicMeter());
+        if (this.hasScreenMeter()) emitData('screenMeter', this.getScreenMeter());
+      }, 1);
+    }
+  }
+
+  /**
+   * Stops the interval responsible for monitoring volume meters.
+   *
+   * This function clears the active monitor interval if it exists
+   * and no mic or screen meters are currently active.
+   */
+  #stopMonitorInterval() {
+    if (this.#monitorIntervalId && !this.hasMicMeter() && !this.hasScreenMeter()) {
+      clearInterval(this.#monitorIntervalId);
+      this.#monitorIntervalId = null;
+    }
+  }
+
+  /**
+   * Configuration used for microphone streaming.
+   *
+   * @type {StreamConfig}
+   */
+  #micConfig = {
+    mimeType: 'audio/webm;codecs=opus',
+    timeslice: 250,
+  };
+
+  /**
+   * Configuration used for camera streaming.
+   *
+   * @type {StreamConfig}
+   */
+  #camConfig = {
+    mimeType: 'video/webm;codecs=vp9,opus',
+    timeslice: 300,
+  };
+
+  /**
+   * Configuration used for screen streaming.
+   *
+   * @type {StreamConfig}
+   */
+  #screenConfig = {
+    mimeType: 'video/webm;codecs=vp9,opus',
+    timeslice: 500,
+  };
+
+  /**
+   * Updates the configuration for a specific media source.
+   *
+   * @param {'mic'|'cam'|'screen'} target - The config to update.
+   * @param {{ mimeType?: string, timeslice?: number }} updates - The new configuration values.
+   *
+   * @throws {Error} If the target is invalid.
+   * @throws {Error} If the mimeType is invalid or unsupported.
+   * @throws {Error} If the timeslice is not a positive finite number.
+   */
+  updateMediaConfig(target, updates = {}) {
+    if (!['mic', 'cam', 'screen'].includes(target))
+      throw new Error(`Invalid config target: "${target}"`);
+
+    const currentConfig = {
+      mic: this.#micConfig,
+      cam: this.#camConfig,
+      screen: this.#screenConfig,
+    }[target];
+
+    const updated = { ...currentConfig };
+
+    if ('mimeType' in updates) {
+      const mime = updates.mimeType;
+      if (typeof mime !== 'string' || !MediaRecorder.isTypeSupported(mime))
+        throw new Error(`Invalid or unsupported MIME type: "${mime}"`);
+      updated.mimeType = mime;
+    }
+
+    if ('timeslice' in updates) {
+      const slice = updates.timeslice;
+      if (typeof slice !== 'number' || !Number.isFinite(slice) || slice <= 0)
+        throw new Error(`Invalid timeslice: must be a positive number (got ${slice})`);
+      updated.timeslice = slice;
+    }
+
+    switch (target) {
+      case 'mic':
+        this.#micConfig = updated;
+        break;
+      case 'cam':
+        this.#camConfig = updated;
+        break;
+      case 'screen':
+        this.#screenConfig = updated;
+        break;
+    }
+  }
 
   /**
    * Returns the current microphone stream if it is a valid MediaStream.
@@ -118,12 +376,8 @@ export class TinyStreamManager {
    * This constructor initializes the internal socket reference and sets up the default
    * structure for tracking media devices and active media streams. It also automatically
    * triggers a device list update on instantiation.
-   *
-   * @param {Socket} socket - The socket instance used for communication.
    */
-  constructor(socket) {
-    /** @type {Socket} */
-    this.socket = socket;
+  constructor() {
     this.updateDeviceList();
   }
 
@@ -235,6 +489,7 @@ export class TinyStreamManager {
         'ended',
         () => {
           this.#stopSocketStream(label);
+          this.#stopMonitorInterval();
         },
         { once: true },
       );
@@ -267,9 +522,14 @@ export class TinyStreamManager {
     }
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const hasAudio = stream.getAudioTracks().length > 0;
+    if (!hasAudio) throw new Error('The microphone stream does not contain any audio track.');
+
     this.micStream = stream;
     this.micMeter = new VolumeMeter();
     this.micMeter.connectToSource(stream);
+    this.#startMonitorInterval();
+    this.#sendStreamOverSocket(stream, 'mic', this.#micConfig);
     return stream;
   }
 
@@ -300,6 +560,7 @@ export class TinyStreamManager {
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     this.camStream = stream;
+    this.#sendStreamOverSocket(stream, 'cam', this.#camConfig);
     return stream;
   }
 
@@ -333,6 +594,8 @@ export class TinyStreamManager {
       this.screenMeter.connectToSource(stream);
     } else this.screenMeter = null;
 
+    this.#startMonitorInterval();
+    this.#sendStreamOverSocket(stream, 'screen', this.#screenConfig);
     return stream;
   }
 
@@ -352,6 +615,8 @@ export class TinyStreamManager {
    *
    * @throws {Error} If the stream is not a valid MediaStream.
    * @throws {Error} If a recorder is already active for the given label.
+   * @throws {Error} If the MIME type is not supported by MediaRecorder.
+   * @throws {Error} If timeslice is not a positive number.
    * @throws {DOMException} If the MediaRecorder cannot be created with the given stream and options.
    */
   #sendStreamOverSocket(stream, label, options = {}) {
@@ -361,57 +626,23 @@ export class TinyStreamManager {
     if (this.#recorders.has(label))
       throw new Error(`A recorder for "${label}" is already running.`);
 
-    const mime = options.mimeType || 'video/webm;codecs=vp9,opus';
-    const timeslice = options.timeslice || 100;
+    const mime = options.mimeType;
+    const timeslice = options.timeslice ?? 100;
+
+    if (typeof mime !== 'string' || !MediaRecorder.isTypeSupported(mime))
+      throw new Error(`Unsupported or invalid MIME type: "${mime}"`);
+    if (typeof timeslice !== 'number' || !Number.isFinite(timeslice) || timeslice <= 0)
+      throw new Error(`Invalid timeslice: must be a positive number (got ${timeslice})`);
 
     const recorder = new MediaRecorder(stream, { mimeType: mime });
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.socket.emit(label, e.data, { time: Date.now() });
+      if (e.data.size > 0) this.#emit(label, e.data);
     };
 
     recorder.start(timeslice);
     this.#recorders.set(label, recorder);
     this.#stopDeviceDetector(stream, label);
-  }
-
-  /**
-   * Sends the current microphone stream over the socket connection.
-   *
-   * This method retrieves the microphone stream using `getMicStream()` and transmits it
-   * through the internal socket using the provided channel label or a default label ('mic').
-   *
-   * @param {string} [label='mic'] - Optional custom socket event label.
-   * @throws {Error} If the microphone stream is invalid or not available.
-   */
-  sendMicStream(label = 'mic') {
-    this.#sendStreamOverSocket(this.getMicStream(), label);
-  }
-
-  /**
-   * Sends the current webcam stream over the socket connection.
-   *
-   * This method retrieves the webcam stream using `getCamStream()` and transmits it
-   * through the internal socket using the provided channel label or a default label ('cam').
-   *
-   * @param {string} [label='cam'] - Optional custom socket event label.
-   * @throws {Error} If the webcam stream is invalid or not available.
-   */
-  sendCamStream(label = 'cam') {
-    this.#sendStreamOverSocket(this.getCamStream(), label);
-  }
-
-  /**
-   * Sends the current screen sharing stream over the socket connection.
-   *
-   * This method retrieves the screen stream using `getScreenStream()` and transmits it
-   * through the internal socket using the provided channel label or a default label ('screen').
-   *
-   * @param {string} [label='screen'] - Optional custom socket event label.
-   * @throws {Error} If the screen sharing stream is invalid or not available.
-   */
-  sendScreenStream(label = 'screen') {
-    this.#sendStreamOverSocket(this.getScreenStream(), label);
   }
 
   /**
