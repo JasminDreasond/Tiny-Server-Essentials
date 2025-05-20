@@ -25,6 +25,38 @@ export class TinyStreamManager {
   #sysEvents = new EventEmitter();
   #sysEventsUsed = false;
 
+  /** @type {Record<string, string>} */
+  Events = {
+    /** Event emitted when the webcam stream is started or updated. */
+    Cam: 'Cam',
+
+    /** Event emitted when the microphone stream is started or updated. */
+    Mic: 'Mic',
+
+    /** Event emitted when the screen sharing stream is started or updated. */
+    Screen: 'Screen',
+
+    /** Event emitted periodically with screen audio volume data. */
+    ScreenMeter: 'ScreenMeter',
+
+    /** Event emitted periodically with microphone audio volume data. */
+    MicMeter: 'MicMeter',
+  };
+
+  /**
+   * Checks whether a given event name is defined in the Events map.
+   *
+   * This method verifies if the provided string matches one of the predefined
+   * event labels (e.g., "Mic", "Cam", "Screen", "MicMeter", "ScreenMeter").
+   *
+   * @param {string} name - The name of the event to check.
+   * @returns {boolean} Returns `true` if the event exists in the Events map, otherwise `false`.
+   */
+  existsEvent(name) {
+    if (typeof this.Events[name] === 'string') return true;
+    return false;
+  }
+
   /**
    * Emits an event with optional arguments to all system emit.
    * @param {string | symbol} event - The name of the event to emit.
@@ -194,8 +226,8 @@ export class TinyStreamManager {
           this.#emit(eventName, { audio, perc: 100 - perc, vol: audio.volume });
         };
 
-        if (this.hasMicMeter()) emitData('micMeter', this.getMicMeter());
-        if (this.hasScreenMeter()) emitData('screenMeter', this.getScreenMeter());
+        if (this.hasMicMeter()) emitData(this.Events.MicMeter, this.getMicMeter());
+        if (this.hasScreenMeter()) emitData(this.Events.ScreenMeter, this.getScreenMeter());
       }, 1);
     }
   }
@@ -534,7 +566,7 @@ export class TinyStreamManager {
     this.micMeter = new VolumeMeter();
     this.micMeter.connectToSource(stream);
     this.#startMonitorInterval();
-    this.#sendStreamOverSocket(stream, 'mic', this.#micConfig);
+    this.#sendStreamOverSocket(stream, this.Events.Mic, this.#micConfig);
     return stream;
   }
 
@@ -569,7 +601,7 @@ export class TinyStreamManager {
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     this.camStream = stream;
-    this.#sendStreamOverSocket(stream, 'cam', this.#camConfig);
+    this.#sendStreamOverSocket(stream, this.Events.Cam, this.#camConfig);
     return stream;
   }
 
@@ -609,7 +641,7 @@ export class TinyStreamManager {
     } else this.screenMeter = null;
 
     this.#startMonitorInterval();
-    this.#sendStreamOverSocket(stream, 'screen', this.#screenConfig);
+    this.#sendStreamOverSocket(stream, this.Events.Screen, this.#screenConfig);
     return stream;
   }
 
