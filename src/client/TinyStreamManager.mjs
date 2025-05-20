@@ -321,31 +321,6 @@ export class TinyStreamManager {
   }
 
   /**
-   * Stops a previously started MediaRecorder associated with the given label.
-   *
-   * @param {string} label - The socket channel label (e.g., 'mic', 'cam', 'screen').
-   */
-  stopSocketStream(label) {
-    const recorder = this.#recorders.get(label);
-    if (recorder instanceof MediaRecorder && recorder.state !== 'inactive') {
-      recorder.stop();
-      this.#recorders.delete(label);
-    }
-  }
-
-  /**
-   * Stops all active MediaRecorders that were sending data over socket.
-   */
-  stopAllSocketStreams() {
-    for (const [label, recorder] of this.#recorders.entries()) {
-      if (recorder instanceof MediaRecorder && recorder.state !== 'inactive') {
-        recorder.stop();
-      }
-    }
-    this.#recorders.clear();
-  }
-
-  /**
    * Sends the current microphone stream over the socket connection.
    *
    * This method retrieves the microphone stream using `getMicStream()` and transmits it
