@@ -79,7 +79,7 @@ import { VolumeMeter } from './VolumeMeter.mjs';
  * - `navigator.mediaDevices.getUserMedia` for mic/cam.
  * - `navigator.mediaDevices.getDisplayMedia` for screen sharing.
  * - Optional support for `chromeMediaSource` and related properties in Electron environments.
- * 
+ *
  * @class
  * @beta
  */
@@ -100,15 +100,38 @@ export class TinyStreamManager {
   #sysEvents = new EventEmitter();
   #sysEventsUsed = false;
 
-  /** @type {Record<string, string>} */
+  /**
+   * Event labels used internally and externally for stream control and monitoring.
+   * These events are emitted or listened to over socket or internal dispatch.
+   *
+   * @type {Record<string, string>}
+   */
   Events = {
-    /** Event emitted when the webcam stream is started or updated. */
+    /** Event emitted to request starting the webcam stream. */
+    StartCam: 'StartCam',
+
+    /** Event emitted to request starting the microphone stream. */
+    StartMic: 'StartMic',
+
+    /** Event emitted to request starting the screen sharing stream. */
+    StartScreen: 'StartScreen',
+
+    /** Event emitted to request stopping the webcam stream. */
+    StopCam: 'StopCam',
+
+    /** Event emitted to request stopping the microphone stream. */
+    StopMic: 'StopMic',
+
+    /** Event emitted to request stopping the screen sharing stream. */
+    StopScreen: 'StopScreen',
+
+    /** Event emitted when the webcam stream is transmitted. */
     Cam: 'Cam',
 
-    /** Event emitted when the microphone stream is started or updated. */
+    /** Event emitted when the microphone stream is transmitted. */
     Mic: 'Mic',
 
-    /** Event emitted when the screen sharing stream is started or updated. */
+    /** Event emitted when the screen sharing stream is transmitted. */
     Screen: 'Screen',
 
     /** Event emitted periodically with screen audio volume data. */
@@ -599,6 +622,7 @@ export class TinyStreamManager {
       track.addEventListener(
         'ended',
         () => {
+          this.#emit(`Stop${label}`);
           this.#stopSocketStream(label);
           this.#stopMonitorInterval();
         },
@@ -646,6 +670,7 @@ export class TinyStreamManager {
     this.micMeter = new VolumeMeter();
     this.micMeter.connectToSource(stream, hearVoice);
     this.#startMonitorInterval();
+    this.#emit(this.Events.StartMic);
     this.#sendStreamOverSocket(stream, this.Events.Mic, this.#micConfig);
     return stream;
   }
@@ -681,6 +706,7 @@ export class TinyStreamManager {
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     this.camStream = stream;
+    this.#emit(this.Events.StartCam);
     this.#sendStreamOverSocket(stream, this.Events.Cam, this.#camConfig);
     return stream;
   }
@@ -722,6 +748,7 @@ export class TinyStreamManager {
     } else this.screenMeter = null;
 
     this.#startMonitorInterval();
+    this.#emit(this.Events.StartScreen);
     this.#sendStreamOverSocket(stream, this.Events.Screen, this.#screenConfig);
     return stream;
   }
