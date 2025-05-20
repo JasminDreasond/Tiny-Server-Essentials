@@ -592,10 +592,11 @@ export class TinyStreamManager {
    * - Starts volume monitoring and emits microphone volume under the label `"micMeter"`.
    *
    * @param {string|MediaTrackConstraints|null} options - Either a deviceId string, a full constraints object, or null for defaults.
+   * @param {boolean} hearVoice - `true` =  Hear your voice.
    * @returns {Promise<MediaStream>} A promise resolving to the active audio stream.
    * @throws {Error} If the deviceId is invalid or if no audio track is found in the stream.
    */
-  async startMic(options = null) {
+  async startMic(options = null, hearVoice = false) {
     let constraints;
     if (typeof options === 'string') {
       const valid = this.#devices.audio.some((d) => d.deviceId === options);
@@ -617,7 +618,7 @@ export class TinyStreamManager {
 
     this.micStream = stream;
     this.micMeter = new VolumeMeter();
-    this.micMeter.connectToSource(stream);
+    this.micMeter.connectToSource(stream, hearVoice);
     this.#startMonitorInterval();
     this.#sendStreamOverSocket(stream, this.Events.Mic, this.#micConfig);
     return stream;
@@ -669,10 +670,11 @@ export class TinyStreamManager {
    * - If audio is present, starts volume monitoring and emits under the label `"screenMeter"`.
    *
    * @param {boolean|ScreenShareConstraints} options - `true` = enable audio, `false` = no audio, or an object with audio/video constraints.
+   * @param {boolean} hearScreen - `true` =  Hear your screen audio (**Your ear will be destroyed!!!**).
    * @returns {Promise<MediaStream>} A promise resolving to the active screen capture stream.
    * @throws {Error} If the options are invalid.
    */
-  async startScreen(options = true) {
+  async startScreen(options = true, hearScreen = false) {
     let constraints;
     if (typeof options === 'boolean') {
       constraints = {
@@ -690,7 +692,7 @@ export class TinyStreamManager {
     const hasAudio = stream.getAudioTracks().length > 0;
     if (hasAudio) {
       this.screenMeter = new VolumeMeter();
-      this.screenMeter.connectToSource(stream);
+      this.screenMeter.connectToSource(stream, hearScreen);
     } else this.screenMeter = null;
 
     this.#startMonitorInterval();

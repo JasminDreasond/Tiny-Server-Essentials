@@ -28,6 +28,7 @@
     <p>This is a very simple HTML5 page.</p>
 
     <button id="active-stream">Active Stream</button>
+    <button id="active-stream-2">Active Quiet Stream</button>
 
     <p>Local volume</p>
     <div id="progressContainer">
@@ -71,27 +72,32 @@
         console.log(manager.getDevicesByKind('speaker'));
       }
 
-      async function startAll() {
+      async function startAll(isQuiet = false) {
+        console.log(!isQuiet);
         // Usa dispositivos específicos se quiser
-        await manager.startMic({
-          deviceId: { exact: 'default' },
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          highpassFilter: false,
-        });
+        await manager.startMic(
+          {
+            deviceId: { exact: 'default' },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            highpassFilter: false,
+          },
+          !isQuiet,
+        );
 
+        await manager.startScreen(true, !isQuiet);
         await manager.startCam();
-        await manager.startScreen();
-        await manager.updateDeviceList();
 
         // Lista todos os dispositivos
+        await manager.updateDeviceList();
         console.table(manager.getDevicesByKind('audio'));
         console.table(manager.getDevicesByKind('video'));
         console.table(manager.getDevicesByKind('speaker'));
       }
 
-      document.getElementById('active-stream').addEventListener('click', () => startAll());
+      document.getElementById('active-stream').addEventListener('click', () => startAll(false));
+      document.getElementById('active-stream-2').addEventListener('click', () => startAll(true));
     </script>
   </body>
 </html>
