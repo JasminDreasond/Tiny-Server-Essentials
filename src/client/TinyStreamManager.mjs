@@ -1,4 +1,6 @@
 import { TinyPromiseQueue } from 'tiny-essentials';
+import { VolumeMeter } from './VolumeMeter.mjs';
+
 /** @typedef {import('socket.io').Socket} Socket */
 
 export class TinyStreamManager {
@@ -17,6 +19,11 @@ export class TinyStreamManager {
     speaker: [],
     video: [],
   };
+
+  /** @type {VolumeMeter|null} */
+  micMeter = null;
+  /** @type {VolumeMeter|null} */
+  screenMeter = null;
 
   /** @type {MediaStream|null} */
   micStream = null;
@@ -61,6 +68,48 @@ export class TinyStreamManager {
     if (!(this.screenStream instanceof MediaStream))
       throw new Error('Screen stream is not a valid MediaStream');
     return this.screenStream;
+  }
+
+  /**
+   * Returns the current microphone volume meter if it is a valid VolumeMeter instance.
+   *
+   * @returns {VolumeMeter} The active microphone volume meter.
+   * @throws {Error} If the microphone meter is not a valid VolumeMeter instance.
+   */
+  getMicMeter() {
+    if (!(this.micMeter instanceof VolumeMeter))
+      throw new Error('Microphone meter is not a valid VolumeMeter instance.');
+    return this.micMeter;
+  }
+
+  /**
+   * Returns the current screen volume meter if it is a valid VolumeMeter instance.
+   *
+   * @returns {VolumeMeter} The active screen volume meter.
+   * @throws {Error} If the screen meter is not a valid VolumeMeter instance.
+   */
+  getScreenMeter() {
+    if (!(this.screenMeter instanceof VolumeMeter))
+      throw new Error('Screen meter is not a valid VolumeMeter instance.');
+    return this.screenMeter;
+  }
+
+  /**
+   * Checks if the microphone volume meter exists and is a valid VolumeMeter instance.
+   *
+   * @returns {boolean} True if micMeter exists and is valid, false otherwise.
+   */
+  hasMicMeter() {
+    return this.micMeter instanceof VolumeMeter;
+  }
+
+  /**
+   * Checks if the screen volume meter exists and is a valid VolumeMeter instance.
+   *
+   * @returns {boolean} True if screenMeter exists and is valid, false otherwise.
+   */
+  hasScreenMeter() {
+    return this.screenMeter instanceof VolumeMeter;
   }
 
   /**
@@ -219,6 +268,8 @@ export class TinyStreamManager {
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     this.micStream = stream;
+    this.micMeter = new VolumeMeter();
+    this.micMeter.connectToSource(stream);
     return stream;
   }
 
@@ -276,6 +327,12 @@ export class TinyStreamManager {
     } else throw new Error('Invalid screen share options.');
     const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
     this.screenStream = stream;
+    const hasAudio = stream.getAudioTracks().length > 0;
+    if (hasAudio) {
+      this.screenMeter = new VolumeMeter();
+      this.screenMeter.connectToSource(stream);
+    } else this.screenMeter = null;
+
     return stream;
   }
 
@@ -370,6 +427,7 @@ export class TinyStreamManager {
       throw new Error('No active microphone stream to stop.');
     this.micStream.getTracks().forEach((t) => t.stop());
     this.micStream = null;
+    this.micMeter = null;
   }
 
   /**
@@ -400,6 +458,7 @@ export class TinyStreamManager {
       throw new Error('No active screen sharing stream to stop.');
     this.screenStream.getTracks().forEach((t) => t.stop());
     this.screenStream = null;
+    this.screenMeter = null;
   }
 
   /**

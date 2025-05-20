@@ -12,10 +12,7 @@
     <h2><a href="./pudding.txt" target="_blank">Pudding! :3</a></h2>
     <p>This is a very simple HTML5 page.</p>
 
-    <select id="micList"></select>
-
     <button id="active-stream">Active Stream</button>
-    <button id="get-devices">Get Devices</button>
 
     <script>
       const socket = io('http://localhost:3050');
@@ -38,16 +35,23 @@
       }
 
       async function startAll() {
+        // Usa dispositivos específicos se quiser
+        await manager.startMicrophone({
+          deviceId: { exact: 'default' },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          highpassFilter: false,
+        });
+
+        await manager.startWebcam();
+        await manager.startScreenShare();
         await manager.updateDeviceList();
 
         // Lista todos os dispositivos
         console.table(manager.getDevicesByKind('audio'));
         console.table(manager.getDevicesByKind('video'));
-
-        // Usa dispositivos específicos se quiser
-        const mic = await manager.startMicrophone(); // ou com deviceId
-        const cam = await manager.startWebcam(); // ou com deviceId
-        const screen = await manager.startScreenShare();
+        console.table(manager.getDevicesByKind('speaker'));
 
         manager.sendMicStream('mic');
         manager.sendCamStream('cam');
@@ -55,7 +59,6 @@
       }
 
       document.getElementById('active-stream').addEventListener('click', () => startAll());
-      document.getElementById('get-devices').addEventListener('click', () => getDevices());
     </script>
   </body>
 </html>
