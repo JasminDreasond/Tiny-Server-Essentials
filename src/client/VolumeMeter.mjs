@@ -23,17 +23,15 @@ export class VolumeMeter {
     /** @type {ScriptProcessorNode} */
     this.script = this.context.createScriptProcessor(2048, 1, 1);
 
-    const that = this;
-
     /** @param {AudioProcessingEvent} event */
-    this.script.onaudioprocess = function (event) {
+    this.script.onaudioprocess = (event) => {
       /** @type {Float32Array} */
       const input = event.inputBuffer.getChannelData(0);
       let sum = 0.0;
       for (let i = 0; i < input.length; ++i) {
         sum += input[i] * input[i];
       }
-      that.volume = Math.sqrt(sum / input.length);
+      this.volume = Math.sqrt(sum / input.length);
     };
   }
 
