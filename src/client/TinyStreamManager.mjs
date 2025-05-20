@@ -57,6 +57,32 @@ import { VolumeMeter } from './VolumeMeter.mjs';
  *     Constraints for screen capture, can be simple (true) or detailed.
  */
 
+/**
+ * Manages media streams (microphone, camera, screen) with flexible device constraints,
+ * socket emission support, and audio volume metering.
+ *
+ * This class:
+ * - Allows starting and managing media input streams (mic, cam, screen).
+ * - Supports custom constraints and device targeting via deviceId or full constraint objects.
+ * - Emits media streams to a socket or handler using predefined labels (mic, cam, screen, etc.).
+ * - Provides audio volume metering for microphone and screen when audio is available.
+ * - Supports Electron-specific constraints when applicable.
+ *
+ * Events emitted:
+ * - `"Mic"`: Audio stream from microphone.
+ * - `"MicMeter"`: Volume level from microphone.
+ * - `"Cam"`: Video stream from webcam.
+ * - `"Screen"`: Video stream from screen capture.
+ * - `"ScreenMeter"`: Volume level from screen audio.
+ *
+ * Internally uses:
+ * - `navigator.mediaDevices.getUserMedia` for mic/cam.
+ * - `navigator.mediaDevices.getDisplayMedia` for screen sharing.
+ * - Optional support for `chromeMediaSource` and related properties in Electron environments.
+ * 
+ * @class
+ * @beta
+ */
 export class TinyStreamManager {
   #loadingDevices = false;
   #queue = new TinyPromiseQueue();
