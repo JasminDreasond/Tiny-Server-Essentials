@@ -502,8 +502,13 @@ export class TinyStreamManager {
    * If a deviceId is provided, it targets a specific microphone. You can also pass in
    * a full MediaTrackConstraints object to fine-tune behavior (e.g., noise suppression, echo cancellation).
    *
+   * This method:
+   * - Emits the audio stream over the socket under the label `"mic"`.
+   * - Starts volume monitoring and emits microphone volume under the label `"micMeter"`.
+   *
    * @param {string|MediaTrackConstraints|null} options - Either a deviceId string, a full constraints object, or null for defaults.
    * @returns {Promise<MediaStream>} A promise resolving to the active audio stream.
+   * @throws {Error} If the deviceId is invalid or if no audio track is found in the stream.
    */
   async startMicrophone(options = null) {
     let constraints;
@@ -539,8 +544,12 @@ export class TinyStreamManager {
    * Accepts a deviceId string for a specific webcam, or a full MediaTrackConstraints
    * object to customize video input (resolution, frameRate, etc.).
    *
+   * This method:
+   * - Emits the video stream over the socket under the label `"cam"`.
+   *
    * @param {string|MediaTrackConstraints|null} options - Either a deviceId string, a full constraints object, or null for defaults.
    * @returns {Promise<MediaStream>} A promise resolving to the active video stream.
+   * @throws {Error} If the deviceId is invalid.
    */
   async startWebcam(options = null) {
     let constraints;
@@ -570,8 +579,13 @@ export class TinyStreamManager {
    * You can pass a boolean to enable or disable audio,
    * or an object to define custom `audio` and `video` constraints.
    *
+   * This method:
+   * - Emits the screen stream over the socket under the label `"screen"`.
+   * - If audio is present, starts volume monitoring and emits under the label `"screenMeter"`.
+   *
    * @param {boolean|MediaStreamConstraints} options - `true` = enable audio, `false` = no audio, or an object with audio/video constraints.
    * @returns {Promise<MediaStream>} A promise resolving to the active screen capture stream.
+   * @throws {Error} If the options are invalid.
    */
   async startScreenShare(options = true) {
     let constraints;
