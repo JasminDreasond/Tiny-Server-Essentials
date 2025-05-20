@@ -490,6 +490,10 @@ export class TinyStreamManager {
     return devices;
   }
 
+  getAllDevices() {
+    return [...this.#devices.speaker, ...this.#devices.audio, ...this.#devices.video];
+  }
+
   /**
    * Stops an active MediaRecorder associated with a specific socket label.
    *
@@ -542,7 +546,7 @@ export class TinyStreamManager {
    * @returns {Promise<MediaStream>} A promise resolving to the active audio stream.
    * @throws {Error} If the deviceId is invalid or if no audio track is found in the stream.
    */
-  async startMicrophone(options = null) {
+  async startMic(options = null) {
     let constraints;
     if (typeof options === 'string') {
       const valid = this.#devices.audio.some((d) => d.deviceId === options);
@@ -583,7 +587,7 @@ export class TinyStreamManager {
    * @returns {Promise<MediaStream>} A promise resolving to the active video stream.
    * @throws {Error} If the deviceId is invalid.
    */
-  async startWebcam(options = null) {
+  async startCam(options = null) {
     let constraints;
     if (typeof options === 'string') {
       const valid = this.#devices.video.some((d) => d.deviceId === options);
@@ -619,7 +623,7 @@ export class TinyStreamManager {
    * @returns {Promise<MediaStream>} A promise resolving to the active screen capture stream.
    * @throws {Error} If the options are invalid.
    */
-  async startScreenShare(options = true) {
+  async startScreen(options = true) {
     let constraints;
     if (typeof options === 'boolean') {
       constraints = {
@@ -699,7 +703,7 @@ export class TinyStreamManager {
    *
    * @throws {Error} If the microphone stream is not active or invalid.
    */
-  stopMicStream() {
+  stopMic() {
     if (!(this.micStream instanceof MediaStream))
       throw new Error('No active microphone stream to stop.');
     this.micStream.getTracks().forEach((t) => t.stop());
@@ -715,7 +719,7 @@ export class TinyStreamManager {
    *
    * @throws {Error} If the webcam stream is not active or invalid.
    */
-  stopCamStream() {
+  stopCam() {
     if (!(this.camStream instanceof MediaStream))
       throw new Error('No active webcam stream to stop.');
     this.camStream.getTracks().forEach((t) => t.stop());
@@ -730,7 +734,7 @@ export class TinyStreamManager {
    *
    * @throws {Error} If the screen sharing stream is not active or invalid.
    */
-  stopScreenStream() {
+  stopScreen() {
     if (!(this.screenStream instanceof MediaStream))
       throw new Error('No active screen sharing stream to stop.');
     this.screenStream.getTracks().forEach((t) => t.stop());
@@ -744,9 +748,9 @@ export class TinyStreamManager {
    * This method calls the individual stop methods to ensure each stream is safely terminated.
    * Use this when you want to stop all media input/output at once.
    */
-  stopAllStreams() {
-    this.stopMicStream();
-    this.stopCamStream();
-    this.stopScreenStream();
+  stopAll() {
+    this.stopMic();
+    this.stopCam();
+    this.stopScreen();
   }
 }

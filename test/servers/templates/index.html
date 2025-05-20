@@ -73,7 +73,7 @@
 
       async function startAll() {
         // Usa dispositivos específicos se quiser
-        await manager.startMicrophone({
+        await manager.startMic({
           deviceId: { exact: 'default' },
           echoCancellation: false,
           noiseSuppression: false,
@@ -81,8 +81,8 @@
           highpassFilter: false,
         });
 
-        await manager.startWebcam();
-        await manager.startScreenShare();
+        await manager.startCam();
+        await manager.startScreen();
         await manager.updateDeviceList();
 
         // Lista todos os dispositivos
