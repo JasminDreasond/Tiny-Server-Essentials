@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
+import helmet from 'helmet';
+
 import TinyExpress from '../../../dist/Express.mjs';
 
 import { fileURLToPath } from 'url';
@@ -17,6 +19,12 @@ const __dirname = dirname(__filename);
 const insertExpress = (app, http) => {
   app.use(cookieParser());
   app.use(bodyParser.json());
+  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(helmet({
+    contentSecurityPolicy: false
+  }));
+
+  http.installCsrfToken();
 
   app.get('/', (req, res) => {
     console.log(req.ips, req.ip, req.socket?.remoteAddress);
@@ -75,9 +83,23 @@ const insertExpress = (app, http) => {
     res.send(yay);
   });
 
-  http.installErrors({
-    errNext: (status, err, req, res) => http.sendHttpError(res, status),
+  // Endpoint to see the token in cookie
+  app.get('/csrf-token', (req, res) => {
+    const { cookieName } = http.geCsrftOptions();
+    res.json({
+      message: 'Token is set via cookie. Use the token as header in protected routes.',
+      token: req.cookies[cookieName],
+    });
   });
+
+  app.post('/secure', http.verifyCsrfToken(), (req, res) => {
+    res.json({ success: true, message: 'CSRF check passed!' });
+  });
+
+  /** http.installErrors({
+    errNext: (status, err, req, res) => http.sendHttpError(res, status),
+  }); */
+  http.installErrors();
 };
 
 export default insertExpress;

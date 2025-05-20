@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { Readable as ReadableStream } from 'stream';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { createServer, Server as HttpServer } from 'http';
 import { Server as HttpsServer } from 'https';
 import express from 'express';
@@ -50,6 +50,14 @@ class TinyExpress {
 
   /** @type {string} */
   #activeExtractor = 'DEFAULT';
+
+  /** @type {{ cookieName: string; headerName: string; errMessage: string, enabled: boolean }} */
+  #csrf = {
+    cookieName: '_csrf',
+    headerName: 'X-Csrf-Token',
+    errMessage: 'Invalid or missing CSRF token',
+    enabled: false,
+  };
 
   /**
    * A list of domain validators using different request properties.
@@ -200,6 +208,88 @@ class TinyExpress {
         next();
       },
     );
+  }
+
+  /**
+   * Modifies a CSRF config option, only if the key exists and value is a string.
+   * @param {string} key - Either "cookieName" or "headerName".
+   * @param {string} value - The new value to assign.
+   */
+  setCsrfOption(key, value) {
+    if (typeof key !== 'string')
+      throw new Error(`Expected 'key' to be a string, got ${typeof key}`);
+    if (key === 'enabled' || !Object.hasOwn(this.#csrf, key))
+      throw new Error(
+        `Invalid config key '${key}'. Allowed keys: ${Object.keys(this.#csrf)
+          .filter((k) => k !== 'enabled')
+          .join(', ')}`,
+      );
+    if (typeof value !== 'string' || value.trim() === '')
+      throw new Error(`Value for '${key}' must be a non-empty string`);
+    // @ts-ignore
+    this.#csrf[key] = value;
+  }
+
+  /**
+   * Returns a shallow copy of the current CSRF config.
+   * @returns {{ cookieName: string; headerName: string; }}
+   */
+  geCsrftOptions() {
+    return { ...this.#csrf };
+  }
+
+  /**
+   * Middleware to set a CSRF token cookie if it's not already set.
+   * Validates input and ensures safe defaults.
+   *
+   * @param {number} [bytes=24] - Number of bytes to generate for the CSRF token. Must be a positive integer.
+   * @param {{
+   *   httpOnly?: boolean,
+   *   sameSite?: 'lax' | 'strict' | 'none',
+   *   secure?: boolean
+   * }} [options={}] - Options for the CSRF cookie.
+   * @throws {TypeError} If options are invalid or bytes is not a valid integer.
+   */
+  installCsrfToken(bytes = 24, { httpOnly = false, sameSite = 'lax', secure = false } = {}) {
+    if (this.#csrf.enabled) throw new Error('CSRF protection has already been enabled');
+    if (!Number.isInteger(bytes) || bytes <= 0)
+      throw new TypeError('bytes must be a positive integer');
+    if (typeof httpOnly !== 'boolean') throw new TypeError('httpOnly must be a boolean');
+    if (!['lax', 'strict', 'none'].includes(sameSite))
+      throw new TypeError("sameSite must be one of 'lax', 'strict', or 'none'");
+    if (typeof secure !== 'boolean') throw new TypeError('secure must be a boolean');
+
+    this.#csrf.enabled = true;
+    this.root.use((req, res, next) => {
+      const token = req.cookies?.[this.#csrf.cookieName];
+      if (!token) {
+        const newToken = randomBytes(bytes).toString('hex');
+        res.cookie(this.#csrf.cookieName, newToken, {
+          httpOnly,
+          sameSite,
+          secure,
+        });
+        req.cookies[this.#csrf.cookieName] = newToken;
+      }
+      next();
+    });
+  }
+
+  /**
+   * Middleware to verify that the request contains a valid CSRF token in the header.
+   * @returns {RequestHandler}
+   */
+  verifyCsrfToken() {
+    return (req, res, next) => {
+      const tokenFromCookie = req.cookies?.[this.#csrf.cookieName];
+      const tokenFromHeader = req.get(this.#csrf.headerName);
+      if (!tokenFromCookie || !tokenFromHeader || tokenFromCookie !== tokenFromHeader) {
+        const err = createHttpError(403, this.#csrf.errMessage);
+        next(err);
+        return;
+      }
+      next();
+    };
   }
 
   /**
