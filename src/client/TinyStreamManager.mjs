@@ -24,6 +24,8 @@ export class TinyStreamManager {
   camStream = null;
   /** @type {MediaStream|null} */
   screenStream = null;
+  /** @type {Map<string, MediaRecorder>} */
+  #recorders = new Map();
 
   /**
    * Returns the current microphone stream if it is a valid MediaStream.
@@ -140,12 +142,12 @@ export class TinyStreamManager {
    *
    * @param {'audio' | 'video' | 'speaker'} kind - The type of device to retrieve.
    * @returns {MediaDeviceInfo[]} An array of media devices matching the specified kind.
-   * @throws {TypeError} If the input is not a string.
+   * @throws {Error} If the input is not a string.
    * @throws {RangeError} If the input is not one of the accepted device kinds.
    * @throws {Error} If no devices are found for the given kind.
    */
   getDevicesByKind(kind) {
-    if (typeof kind !== 'string') throw new TypeError('Parameter "kind" must be a string');
+    if (typeof kind !== 'string') throw new Error('Parameter "kind" must be a string');
     if (!['audio', 'video', 'speaker'].includes(kind))
       throw new RangeError('Parameter "kind" must be one of: "audio", "video", "speaker"');
     const devices = this.#devices[kind];
@@ -234,7 +236,7 @@ export class TinyStreamManager {
         video: options.video ?? true,
         audio: options.audio ?? false,
       };
-    } else throw new TypeError('Invalid screen share options.');
+    } else throw new Error('Invalid screen share options.');
     const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
     this.screenStream = stream;
     return stream;
@@ -246,8 +248,7 @@ export class TinyStreamManager {
    * This method starts recording the provided MediaStream using the specified MIME type and interval,
    * and emits the resulting data chunks through the socket under the provided label.
    *
-   * The recording continues automatically in slices defined by the `timeslice` parameter.
-   * Each chunk is emitted via `socket.emit()` only if it has data.
+   * It will not start a new recorder if one is already active for the given label.
    *
    * @param {MediaStream} stream - The media stream to send. Must be a valid MediaStream instance.
    * @param {string} label - The socket channel label used to identify the stream (e.g., 'mic', 'cam', 'screen').
@@ -255,10 +256,23 @@ export class TinyStreamManager {
    * @param {string} [options.mimeType='video/webm;codecs=vp9,opus'] - The MIME type used by MediaRecorder.
    * @param {number} [options.timeslice=100] - The interval (in ms) for emitting recorded data chunks.
    *
-   * @throws {TypeError} If the stream is not a valid MediaStream.
+   * @throws {Error} If the stream is not a valid MediaStream.
+   * @throws {Error} If a recorder is already active for the given label.
    * @throws {DOMException} If the MediaRecorder cannot be created with the given stream and options.
    */
   #sendStreamOverSocket(stream, label, options = {}) {
+    if (!(stream instanceof MediaStream))
+      throw new Error('Parameter "stream" must be a valid MediaStream instance.');
+
+    if (this.#recorders.has(label)) {
+      const existing = this.#recorders.get(label);
+      if (existing && existing.state !== 'inactive') {
+        throw new Error(
+          `A stream is already being recorded under the label "${label}". Stop it first before starting a new one.`,
+        );
+      }
+    }
+
     const mime = options.mimeType || 'video/webm;codecs=vp9,opus';
     const timeslice = options.timeslice || 100;
 
@@ -271,42 +285,71 @@ export class TinyStreamManager {
     };
 
     recorder.start(timeslice);
+    this.#recorders.set(label, recorder);
+  }
+
+  /**
+   * Stops a previously started MediaRecorder associated with the given label.
+   *
+   * @param {string} label - The socket channel label (e.g., 'mic', 'cam', 'screen').
+   */
+  stopSocketStream(label) {
+    const recorder = this.#recorders.get(label);
+    if (recorder instanceof MediaRecorder && recorder.state !== 'inactive') {
+      recorder.stop();
+      this.#recorders.delete(label);
+    }
+  }
+
+  /**
+   * Stops all active MediaRecorders that were sending data over socket.
+   */
+  stopAllSocketStreams() {
+    for (const [label, recorder] of this.#recorders.entries()) {
+      if (recorder instanceof MediaRecorder && recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+    }
+    this.#recorders.clear();
   }
 
   /**
    * Sends the current microphone stream over the socket connection.
    *
    * This method retrieves the microphone stream using `getMicStream()` and transmits it
-   * through the internal socket using a predefined channel label ('mic').
+   * through the internal socket using the provided channel label or a default label ('mic').
    *
+   * @param {string} [label='mic'] - Optional custom socket event label.
    * @throws {Error} If the microphone stream is invalid or not available.
    */
-  sendMicStreamOverSocket() {
-    this.#sendStreamOverSocket(this.getMicStream(), 'mic');
+  sendMicStreamOverSocket(label = 'mic') {
+    this.#sendStreamOverSocket(this.getMicStream(), label);
   }
 
   /**
    * Sends the current webcam stream over the socket connection.
    *
    * This method retrieves the webcam stream using `getCamStream()` and transmits it
-   * through the internal socket using a predefined channel label ('cam').
+   * through the internal socket using the provided channel label or a default label ('cam').
    *
+   * @param {string} [label='cam'] - Optional custom socket event label.
    * @throws {Error} If the webcam stream is invalid or not available.
    */
-  sendWebcamStreamOverSocket() {
-    this.#sendStreamOverSocket(this.getCamStream(), 'cam');
+  sendWebcamStreamOverSocket(label = 'cam') {
+    this.#sendStreamOverSocket(this.getCamStream(), label);
   }
 
   /**
    * Sends the current screen sharing stream over the socket connection.
    *
    * This method retrieves the screen stream using `getScreenStream()` and transmits it
-   * through the internal socket using a predefined channel label ('screen').
+   * through the internal socket using the provided channel label or a default label ('screen').
    *
+   * @param {string} [label='screen'] - Optional custom socket event label.
    * @throws {Error} If the screen sharing stream is invalid or not available.
    */
-  sendScreenStreamOverSocket() {
-    this.#sendStreamOverSocket(this.getScreenStream(), 'screen');
+  sendScreenStreamOverSocket(label = 'screen') {
+    this.#sendStreamOverSocket(this.getScreenStream(), label);
   }
 
   /**
