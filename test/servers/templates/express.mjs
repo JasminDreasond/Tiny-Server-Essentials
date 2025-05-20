@@ -20,10 +20,13 @@ const insertExpress = (app, http) => {
   app.use(cookieParser());
   app.use(bodyParser.json());
   app.use(bodyParser.urlencoded({ extended: true }));
-  app.use(helmet({
-    contentSecurityPolicy: false
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
 
+  http.setCsrfRefreshInterval(60000);
   http.installCsrfToken();
 
   app.get('/', (req, res) => {
@@ -85,10 +88,11 @@ const insertExpress = (app, http) => {
 
   // Endpoint to see the token in cookie
   app.get('/csrf-token', (req, res) => {
-    const { cookieName } = http.geCsrftOptions();
+    const { cookieName, refreshCookieName } = http.geCsrftOptions();
     res.json({
       message: 'Token is set via cookie. Use the token as header in protected routes.',
       token: req.cookies[cookieName],
+      refresh: req.cookies[refreshCookieName],
     });
   });
 

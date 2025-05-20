@@ -51,12 +51,23 @@ class TinyExpress {
   /** @type {string} */
   #activeExtractor = 'DEFAULT';
 
-  /** @type {{ cookieName: string; headerName: string; errMessage: string, enabled: boolean }} */
+  /**
+   * @type {{
+   * refreshCookieName: string;
+   * cookieName: string;
+   * headerName: string;
+   * errMessage: string;
+   * enabled: boolean;
+   * refreshInterval: number|null
+   * }}
+   * */
   #csrf = {
+    refreshCookieName: '_csrfRefresh',
     cookieName: '_csrf',
     headerName: 'X-Csrf-Token',
     errMessage: 'Invalid or missing CSRF token',
     enabled: false,
+    refreshInterval: null,
   };
 
   /**
@@ -209,19 +220,18 @@ class TinyExpress {
       },
     );
   }
-
   /**
    * Modifies a CSRF config option, only if the key exists and value is a string.
-   * @param {string} key - Either "cookieName" or "headerName".
+   * @param {string} key - Either "cookieName", "headerName", or "errMessage".
    * @param {string} value - The new value to assign.
    */
   setCsrfOption(key, value) {
     if (typeof key !== 'string')
       throw new Error(`Expected 'key' to be a string, got ${typeof key}`);
-    if (key === 'enabled' || !Object.hasOwn(this.#csrf, key))
+    if (key === 'enabled' || key === 'refreshInterval' || !Object.hasOwn(this.#csrf, key))
       throw new Error(
         `Invalid config key '${key}'. Allowed keys: ${Object.keys(this.#csrf)
-          .filter((k) => k !== 'enabled')
+          .filter((k) => !['enabled', 'refreshInterval'].includes(k))
           .join(', ')}`,
       );
     if (typeof value !== 'string' || value.trim() === '')
@@ -231,24 +241,38 @@ class TinyExpress {
   }
 
   /**
+   * Sets the refresh interval in milliseconds for CSRF tokens.
+   * @param {number|null} ms - Must be a positive number or null to disable.
+   */
+  setCsrfRefreshInterval(ms) {
+    if (ms !== null && (!Number.isInteger(ms) || ms <= 0))
+      throw new Error('refreshInterval must be a positive integer or null');
+    this.#csrf.refreshInterval = ms;
+  }
+
+  /**
    * Returns a shallow copy of the current CSRF config.
-   * @returns {{ cookieName: string; headerName: string; }}
+   * @returns {{
+   * refreshCookieName: string;
+   * cookieName: string;
+   * headerName: string;
+   * errMessage: string;
+   * enabled: boolean;
+   * refreshInterval: number|null
+   * }}
    */
   geCsrftOptions() {
     return { ...this.#csrf };
   }
 
   /**
-   * Middleware to set a CSRF token cookie if it's not already set.
-   * Validates input and ensures safe defaults.
-   *
-   * @param {number} [bytes=24] - Number of bytes to generate for the CSRF token. Must be a positive integer.
+   * Middleware to set a CSRF token cookie if it's not already set or expired.
+   * @param {number} [bytes=24] - Number of bytes to generate for the CSRF token.
    * @param {{
    *   httpOnly?: boolean,
    *   sameSite?: 'lax' | 'strict' | 'none',
    *   secure?: boolean
-   * }} [options={}] - Options for the CSRF cookie.
-   * @throws {TypeError} If options are invalid or bytes is not a valid integer.
+   * }} [options={}]
    */
   installCsrfToken(bytes = 24, { httpOnly = false, sameSite = 'lax', secure = false } = {}) {
     if (this.#csrf.enabled) throw new Error('CSRF protection has already been enabled');
@@ -260,17 +284,40 @@ class TinyExpress {
     if (typeof secure !== 'boolean') throw new TypeError('secure must be a boolean');
 
     this.#csrf.enabled = true;
+    const refresh = this.#csrf.refreshInterval;
+
     this.root.use((req, res, next) => {
-      const token = req.cookies?.[this.#csrf.cookieName];
-      if (!token) {
-        const newToken = randomBytes(bytes).toString('hex');
-        res.cookie(this.#csrf.cookieName, newToken, {
+      let token = req.cookies?.[this.#csrf.cookieName];
+      const csrfIssuedAt = Number(req.cookies?.[this.#csrf.refreshCookieName]);
+      const now = Date.now();
+
+      if (
+        !token ||
+        (refresh &&
+          (!Number.isFinite(csrfIssuedAt) ||
+            Number.isNaN(csrfIssuedAt) ||
+            !csrfIssuedAt ||
+            now - csrfIssuedAt > refresh))
+      ) {
+        token = randomBytes(bytes).toString('hex');
+        res.cookie(this.#csrf.cookieName, token, {
           httpOnly,
           sameSite,
           secure,
         });
-        req.cookies[this.#csrf.cookieName] = newToken;
+
+        req.cookies[this.#csrf.cookieName] = token;
+
+        if (refresh) {
+          res.cookie(this.#csrf.refreshCookieName, String(now), {
+            httpOnly,
+            sameSite,
+            secure,
+          });
+          req.cookies[this.#csrf.refreshCookieName] = String(now);
+        }
       }
+
       next();
     });
   }
