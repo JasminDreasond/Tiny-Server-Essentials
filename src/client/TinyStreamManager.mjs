@@ -310,9 +310,7 @@ export class TinyStreamManager {
     const recorder = new MediaRecorder(stream, { mimeType: mime });
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        this.socket.emit(label, e.data);
-      }
+      if (e.data.size > 0) this.socket.emit(label, e.data, { time: Date.now() });
     };
 
     recorder.start(timeslice);

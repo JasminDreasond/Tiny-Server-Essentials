@@ -23,19 +23,19 @@ const insertSocket = (webSocket) => {
     console.log(cookies);
     console.log(userAgent);
 
-    socket.on('mic', (data) => {
+    socket.on('mic', (data, cfg) => {
       // data = Blob
-      console.log(data);
+      console.log('mic', data, cfg);
     });
 
-    socket.on('cam', (data) => {
+    socket.on('cam', (data, cfg) => {
       // data = Blob
-      console.log(data);
+      console.log('cam', data, cfg);
     });
 
-    socket.on('screen', (data) => {
+    socket.on('screen', (data, cfg) => {
       // data = Blob
-      console.log(data);
+      console.log('screen', data, cfg);
     });
 
     // console.log(req.get('User-Agent'));
