@@ -27,12 +27,12 @@ const insertSocket = (webSocket) => {
       // data = Blob
       console.log(data);
     });
-  
+
     socket.on('cam', (data) => {
       // data = Blob
       console.log(data);
     });
-  
+
     socket.on('screen', (data) => {
       // data = Blob
       console.log(data);

@@ -156,6 +156,43 @@ export class TinyStreamManager {
   }
 
   /**
+   * Stops an active MediaRecorder associated with a specific socket label.
+   *
+   * This method stops the recording process for the given label if a recorder exists,
+   * and removes the recorder reference from the internal map to free up resources.
+   *
+   * Use this to manually stop sending a stream over the socket.
+   *
+   * @param {string} label - The socket event label associated with the recorder (e.g., 'mic', 'cam', 'screen').
+   */
+  #stopSocketStream(label) {
+    const recorder = this.#recorders.get(label);
+    if (recorder) {
+      recorder.stop();
+      this.#recorders.delete(label);
+    }
+  }
+
+  /**
+   * Internal helper to detect when media tracks end, and stop the corresponding socket stream.
+   *
+   * @param {MediaStream} stream - The media stream being monitored.
+   * @param {string} label - The socket label to stop when the stream ends.
+   */
+  #stopDeviceDetector(stream, label = '') {
+    if (!(stream instanceof MediaStream)) return;
+    stream.getTracks().forEach((track) => {
+      track.addEventListener(
+        'ended',
+        () => {
+          this.#stopSocketStream(label);
+        },
+        { once: true },
+      );
+    });
+  }
+
+  /**
    * Starts capturing audio from the microphone with flexible constraints.
    *
    * If a deviceId is provided, it targets a specific microphone. You can also pass in
@@ -264,14 +301,8 @@ export class TinyStreamManager {
     if (!(stream instanceof MediaStream))
       throw new Error('Parameter "stream" must be a valid MediaStream instance.');
 
-    if (this.#recorders.has(label)) {
-      const existing = this.#recorders.get(label);
-      if (existing && existing.state !== 'inactive') {
-        throw new Error(
-          `A stream is already being recorded under the label "${label}". Stop it first before starting a new one.`,
-        );
-      }
-    }
+    if (this.#recorders.has(label))
+      throw new Error(`A recorder for "${label}" is already running.`);
 
     const mime = options.mimeType || 'video/webm;codecs=vp9,opus';
     const timeslice = options.timeslice || 100;
@@ -286,6 +317,7 @@ export class TinyStreamManager {
 
     recorder.start(timeslice);
     this.#recorders.set(label, recorder);
+    this.#stopDeviceDetector(stream, label);
   }
 
   /**
