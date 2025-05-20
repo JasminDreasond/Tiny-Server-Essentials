@@ -49,9 +49,9 @@
         const cam = await manager.startWebcam(); // ou com deviceId
         const screen = await manager.startScreenShare();
 
-        manager.sendStreamOverSocket(mic, 'mic');
-        manager.sendStreamOverSocket(cam, 'cam');
-        manager.sendStreamOverSocket(screen, 'screen');
+        manager.sendMicStreamOverSocket('mic');
+        manager.sendWebcamStreamOverSocket('cam');
+        manager.sendScreenStreamOverSocket('screen');
       }
 
       document.getElementById('active-stream').addEventListener('click', () => startAll());

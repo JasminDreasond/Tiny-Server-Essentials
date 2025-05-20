@@ -23,6 +23,21 @@ const insertSocket = (webSocket) => {
     console.log(cookies);
     console.log(userAgent);
 
+    socket.on('mic', (data) => {
+      // data = Blob
+      console.log(data);
+    });
+  
+    socket.on('cam', (data) => {
+      // data = Blob
+      console.log(data);
+    });
+  
+    socket.on('screen', (data) => {
+      // data = Blob
+      console.log(data);
+    });
+
     // console.log(req.get('User-Agent'));
   });
 };
