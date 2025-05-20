@@ -223,7 +223,7 @@ export class TinyStreamManager {
         const emitData = (eventName, audio) => {
           let perc = audio.volume * 1000;
           perc = perc < 100 ? (perc > 0 ? perc : 0) : 100;
-          this.#emit(eventName, { audio, perc: 100 - perc, vol: audio.volume });
+          this.#emit(eventName, { audio, perc, vol: audio.volume });
         };
 
         if (this.hasMicMeter()) emitData(this.Events.MicMeter, this.getMicMeter());

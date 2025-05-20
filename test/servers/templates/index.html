@@ -5,6 +5,21 @@
     <title>Tiny test! :3</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/TinyStreamManager.js"></script>
+    <style>
+      #progressContainer {
+        width: 400px;
+        height: 20px;
+        background: #ddd;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 20px;
+      }
+      #progressBar {
+        height: 100%;
+        background: #4caf50;
+        width: 0%;
+      }
+    </style>
   </head>
 
   <body>
@@ -14,12 +29,31 @@
 
     <button id="active-stream">Active Stream</button>
 
+    <p>Local volume</p>
+    <div id="progressContainer">
+      <div id="progressBar"></div>
+    </div>
+
     <script>
       const socket = io('http://localhost:3050');
       const manager = new TinyStreamManager();
-      manager.on('mic', (data, metadata) => socket.emit('mic', data, { time: Date.now() }));
-      manager.on('cam', (data, metadata) => socket.emit('cam', data, { time: Date.now() }));
-      manager.on('screen', (data, metadata) => socket.emit('screen', data, { time: Date.now() }));
+
+      manager.on(manager.Events.Mic, (data, metadata) =>
+        socket.emit('mic', data, { time: Date.now() }),
+      );
+
+      manager.on(manager.Events.Cam, (data, metadata) =>
+        socket.emit('cam', data, { time: Date.now() }),
+      );
+
+      manager.on(manager.Events.Screen, (data, metadata) =>
+        socket.emit('screen', data, { time: Date.now() }),
+      );
+
+      manager.on(manager.Events.MicMeter, (data) => {
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.width = Number(data.perc) + '%';
+      });
 
       async function getDevices() {
         await manager.updateDeviceList();
