@@ -29,6 +29,15 @@ const insertExpress = (app, http) => {
   http.setCsrfRefreshInterval(60000);
   http.installCsrfToken();
 
+  app.get('/js/TinyStreamManager.js', (req, res) =>
+    http.sendFile(res, {
+      file: fs.readFileSync(path.join(__dirname, '../../../dist/TinyStreamManager.js')),
+      fileMaxAge: 0,
+      lastModified: new Date(),
+      contentType: 'application/javascript',
+    }),
+  );
+
   app.get('/', (req, res) => {
     console.log(req.ips, req.ip, req.socket?.remoteAddress);
     console.log(http.extractIp(req));
@@ -38,20 +47,20 @@ const insertExpress = (app, http) => {
 
     console.log(req.body);
 
-    res.send('<h1>Home page</h1><h2><a href="./pudding.txt" target="_blank">Pudding! :3</a></h2>');
+    res.send(fs.readFileSync(path.join(__dirname, './index.html'), 'utf-8'));
   });
 
   app.get('/products', (req, res) => {
     res.send('<h1>Products page</h1>');
   });
 
-  app.get('/pudding.txt', (req, res) => {
+  app.get('/pudding.txt', (req, res) =>
     http.sendFile(res, {
       file: Buffer.from('Pudding! :3', 'utf-8'),
       lastModified: new Date(),
       contentType: 'text/plain',
-    });
-  });
+    }),
+  );
 
   app.get('/auth', (req, res) =>
     http.authRequest(
