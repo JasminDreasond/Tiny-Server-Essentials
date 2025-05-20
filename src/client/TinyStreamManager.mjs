@@ -8,6 +8,55 @@ import { VolumeMeter } from './VolumeMeter.mjs';
  * @property {number} timeslice - Interval in milliseconds for emitting data chunks.
  */
 
+/**
+ * @typedef {Object} MandatoryConstraints
+ * @property {'screen'|'window'|'application'|'desktop'} [chromeMediaSource]
+ *     Capture source for Chrome/Electron.
+ * @property {string} [chromeMediaSourceId]
+ *     Specific ID of the capture source (usually obtained via desktopCapturer).
+ * @property {number} [maxWidth]
+ *     Maximum width of the capture.
+ * @property {number} [maxHeight]
+ *     Maximum height of the capture.
+ * @property {number} [maxFrameRate]
+ *     Maximum frame rate.
+ * @property {number} [minWidth]
+ *     Minimum width of the capture.
+ * @property {number} [minHeight]
+ *     Minimum height of the capture.
+ * @property {number} [minFrameRate]
+ *     Minimum frame rate.
+ * @property {boolean} [googLeakyBucket]
+ *     Experimental setting used in some Chromium versions.
+ * @property {boolean} [googTemporalLayeredScreencast]
+ *     Experimental setting for temporal layers in screen capture.
+ */
+
+/**
+ * @typedef {Object} AdvancedScreenVideoConstraints
+ * @property {'screen'|'window'|'application'|'browser'|'monitor'} [mediaSource]
+ *     Capture source, useful in Electron and Firefox.
+ * @property {string} [chromeMediaSource]
+ *     Used in older versions of Chrome/Electron. Usually 'desktop'.
+ * @property {string} [chromeMediaSourceId]
+ *     Used in Electron to select a specific screen or window.
+ * @property {number} [frameRate]
+ *     Desired capture frame rate (e.g., 30 or 60).
+ * @property {number} [width]
+ *     Ideal capture width.
+ * @property {number} [height]
+ *     Ideal capture height.
+ * @property {MandatoryConstraints} [mandatory]
+ *     Allows configuring advanced fields in Electron/Chrome (like `chromeMediaSource`).
+ */
+
+/**
+ * @typedef {Object} ScreenShareConstraints
+ * @property {boolean|MediaTrackConstraints} [audio]
+ * @property {boolean|AdvancedScreenVideoConstraints|MediaTrackConstraints} video
+ *     Constraints for screen capture, can be simple (true) or detailed.
+ */
+
 export class TinyStreamManager {
   #loadingDevices = false;
   #queue = new TinyPromiseQueue();
@@ -619,7 +668,7 @@ export class TinyStreamManager {
    * - Emits the screen stream over the socket under the label `"screen"`.
    * - If audio is present, starts volume monitoring and emits under the label `"screenMeter"`.
    *
-   * @param {boolean|MediaStreamConstraints} options - `true` = enable audio, `false` = no audio, or an object with audio/video constraints.
+   * @param {boolean|ScreenShareConstraints} options - `true` = enable audio, `false` = no audio, or an object with audio/video constraints.
    * @returns {Promise<MediaStream>} A promise resolving to the active screen capture stream.
    * @throws {Error} If the options are invalid.
    */
