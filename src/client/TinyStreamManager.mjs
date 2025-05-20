@@ -354,7 +354,7 @@ export class TinyStreamManager {
    * @param {string} [label='mic'] - Optional custom socket event label.
    * @throws {Error} If the microphone stream is invalid or not available.
    */
-  sendMicStreamOverSocket(label = 'mic') {
+  sendMicStream(label = 'mic') {
     this.#sendStreamOverSocket(this.getMicStream(), label);
   }
 
@@ -367,7 +367,7 @@ export class TinyStreamManager {
    * @param {string} [label='cam'] - Optional custom socket event label.
    * @throws {Error} If the webcam stream is invalid or not available.
    */
-  sendWebcamStreamOverSocket(label = 'cam') {
+  sendCamStream(label = 'cam') {
     this.#sendStreamOverSocket(this.getCamStream(), label);
   }
 
@@ -380,47 +380,53 @@ export class TinyStreamManager {
    * @param {string} [label='screen'] - Optional custom socket event label.
    * @throws {Error} If the screen sharing stream is invalid or not available.
    */
-  sendScreenStreamOverSocket(label = 'screen') {
+  sendScreenStream(label = 'screen') {
     this.#sendStreamOverSocket(this.getScreenStream(), label);
   }
 
   /**
    * Stops the microphone stream if active.
    *
-   * This method stops all tracks from the currently active microphone stream
-   * and clears its reference to prevent reuse or memory leaks.
+   * Stops all tracks from the current microphone stream and clears its reference.
+   * Throws an error if the microphone stream is not set or invalid.
+   *
+   * @throws {Error} If the microphone stream is not active or invalid.
    */
-  stopMicrophoneStream() {
-    if (this.micStream) {
-      this.micStream.getTracks().forEach((t) => t.stop());
-      this.micStream = null;
-    }
+  stopMicStream() {
+    if (!(this.micStream instanceof MediaStream))
+      throw new Error('No active microphone stream to stop.');
+    this.micStream.getTracks().forEach((t) => t.stop());
+    this.micStream = null;
   }
 
   /**
    * Stops the webcam stream if active.
    *
-   * This method stops all tracks from the currently active webcam stream
-   * and clears its reference to prevent reuse or memory leaks.
+   * Stops all tracks from the current webcam stream and clears its reference.
+   * Throws an error if the webcam stream is not set or invalid.
+   *
+   * @throws {Error} If the webcam stream is not active or invalid.
    */
-  stopWebcamStream() {
-    if (this.camStream) {
-      this.camStream.getTracks().forEach((t) => t.stop());
-      this.camStream = null;
-    }
+  stopCamStream() {
+    if (!(this.camStream instanceof MediaStream))
+      throw new Error('No active webcam stream to stop.');
+    this.camStream.getTracks().forEach((t) => t.stop());
+    this.camStream = null;
   }
 
   /**
    * Stops the screen sharing stream if active.
    *
-   * This method stops all tracks from the currently active screen stream
-   * and clears its reference to prevent reuse or memory leaks.
+   * Stops all tracks from the current screen stream and clears its reference.
+   * Throws an error if the screen stream is not set or invalid.
+   *
+   * @throws {Error} If the screen sharing stream is not active or invalid.
    */
   stopScreenStream() {
-    if (this.screenStream) {
-      this.screenStream.getTracks().forEach((t) => t.stop());
-      this.screenStream = null;
-    }
+    if (!(this.screenStream instanceof MediaStream))
+      throw new Error('No active screen sharing stream to stop.');
+    this.screenStream.getTracks().forEach((t) => t.stop());
+    this.screenStream = null;
   }
 
   /**
@@ -430,8 +436,8 @@ export class TinyStreamManager {
    * Use this when you want to stop all media input/output at once.
    */
   stopAllStreams() {
-    this.stopMicrophoneStream();
-    this.stopWebcamStream();
+    this.stopMicStream();
+    this.stopCamStream();
     this.stopScreenStream();
   }
 }
