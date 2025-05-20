@@ -86,6 +86,7 @@ import { VolumeMeter } from './VolumeMeter.mjs';
 export class TinyStreamManager {
   #loadingDevices = false;
   #queue = new TinyPromiseQueue();
+  #firstLoad = false;
 
   /**
    * Important instance used to make event emitter.
@@ -551,6 +552,7 @@ export class TinyStreamManager {
           this.#devices.audio = audio;
           this.#devices.speaker = speaker;
           this.#devices.video = video;
+          this.#firstLoad = true;
         } else {
           this.#devices.audio = [];
           this.#devices.speaker = [];
@@ -580,6 +582,8 @@ export class TinyStreamManager {
    * @throws {Error} If no devices are found for the given kind.
    */
   getDevicesByKind(kind) {
+    if (!this.#firstLoad)
+      throw new Error('Cannot retrieve devices: the manager has not been initialized.');
     if (typeof kind !== 'string') throw new Error('Parameter "kind" must be a string');
     if (!['audio', 'video', 'speaker'].includes(kind))
       throw new RangeError('Parameter "kind" must be one of: "audio", "video", "speaker"');
@@ -588,7 +592,17 @@ export class TinyStreamManager {
     return devices;
   }
 
+  /**
+   * Returns an array containing all available audio, video, and speaker devices.
+   *
+   * This method throws an error if the manager is not yet initialized.
+   *
+   * @returns {MediaDeviceInfo[]} An array of all available media devices.
+   * @throws {Error} If the manager is not yet initialized.
+   */
   getAllDevices() {
+    if (!this.#firstLoad)
+      throw new Error('Cannot retrieve devices: the manager has not been initialized.');
     return [...this.#devices.speaker, ...this.#devices.audio, ...this.#devices.video];
   }
 
