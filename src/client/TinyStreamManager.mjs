@@ -117,6 +117,13 @@ export class TinyStreamManager {
    */
   Events = {
     /**
+     * Event name emitted when the instance is destroyed.
+     * This constant can be used to subscribe to the destruction event of the instance.
+     * @type {'Destroyed'}
+     */
+    Destroyed: 'Destroyed',
+
+    /**
      * Emitted when a media data receiver (e.g., WebSocket, PeerConnection, etc.) has been removed.
      * This may happen when a connection is closed or explicitly terminated.
      * @type {'ReceiverDeleted'}
@@ -1135,6 +1142,7 @@ export class TinyStreamManager {
     });
     this.#streams.clear();
     this.stopAll();
+    this.#emit(this.Events.Destroyed);
     this.#events.removeAllListeners();
     this.#sysEvents.removeAllListeners();
   }

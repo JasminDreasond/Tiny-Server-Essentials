@@ -21,6 +21,13 @@ class TinyMediaReceiver {
    */
   Events = {
     /**
+     * Event name emitted when the instance is destroyed.
+     * This constant can be used to subscribe to the destruction event of the instance.
+     * @type {'Destroyed'}
+     */
+    Destroyed: 'Destroyed',
+
+    /**
      * Emitted when an error occurs in the stream process.
      * Can be used to log or handle critical failures.
      * @type {'Error'}
@@ -361,6 +368,7 @@ class TinyMediaReceiver {
             this.#element.remove();
             this.#element = null;
           }
+          this.#emit(this.Events.Destroyed);
           this.#events.removeAllListeners();
           this.#sysEvents.removeAllListeners();
         } else {
