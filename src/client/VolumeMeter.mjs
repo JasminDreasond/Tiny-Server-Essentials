@@ -13,34 +13,31 @@ export const micVolumeFilter = (volume) => {
 };
 
 export class VolumeMeter {
+  #modulePath = '/js/volume-processor.js';
+
   constructor() {
     /** @type {AudioContext} */
     this.context = new AudioContext();
 
     /** @type {number} */
     this.volume = 0.0;
+  }
 
-    /** @type {ScriptProcessorNode} */
-    this.script = this.context.createScriptProcessor(2048, 1, 1);
-
-    /** @param {AudioProcessingEvent} event */
-    this.script.onaudioprocess = (event) => {
-      /** @type {Float32Array} */
-      const input = event.inputBuffer.getChannelData(0);
-      let sum = 0.0;
-      for (let i = 0; i < input.length; ++i) {
-        sum += input[i] * input[i];
-      }
-      this.volume = Math.sqrt(sum / input.length);
-    };
+  /**
+   * @param {string} newPath New module file path
+   */
+  setModulePath(newPath) {
+    if (typeof newPath !== 'string') throw new TypeError('modulePath must be a string.');
+    if (!newPath.trim()) throw new Error('modulePath cannot be an empty or blank string.');
+    this.#modulePath = newPath;
   }
 
   /**
    * @param {MediaStream} stream
    * @param {boolean} [hearVoice=true]
-   * @returns {void}
+   * @returns {Promise<void>}
    */
-  connectToSource(stream, hearVoice = true) {
+  async connectToSource(stream, hearVoice = true) {
     const hasAudio = stream.getAudioTracks().length > 0;
     if (!hasAudio) throw new Error('The screen capture stream does not contain any audio track.');
 
@@ -58,7 +55,10 @@ export class VolumeMeter {
       );
     });
 
-    // Source
+    // Load and register the AudioWorklet if not already loaded
+    if (!this.context.audioWorklet) throw new Error('AudioWorklet not supported.');
+    await this.context.audioWorklet.addModule(this.#modulePath);
+
     this.source = this.context.createMediaStreamSource(stream);
 
     // Effect
@@ -66,14 +66,19 @@ export class VolumeMeter {
     this.gainNode.gain.value = 1.0;
 
     // Connect source → gain → script (get volume status)
+    this.volumeNode = new AudioWorkletNode(this.context, 'volume-processor');
+    this.volumeNode.port.onmessage = (event) => {
+      this.volume = event.data;
+    };
+
     this.source.connect(this.gainNode);
-    this.gainNode.connect(this.script);
+    this.gainNode.connect(this.volumeNode);
 
     // Just connect to the output if you go to listen
     if (hearVoice) this.gainNode.connect(this.context.destination);
 
     // Connect script into destination
-    this.script.connect(this.context.destination);
+    this.volumeNode.connect(this.context.destination);
   }
 
   /**
@@ -89,10 +94,10 @@ export class VolumeMeter {
   }
 
   #disconnect() {
-    if (!this.source || !this.script || !this.gainNode)
+    if (!this.source || !this.volumeNode || !this.gainNode)
       throw new Error('Cannot stop: audio nodes are not properly initialized.');
     this.source.disconnect();
-    this.script.disconnect();
+    this.volumeNode.disconnect();
     this.gainNode.disconnect();
   }
 

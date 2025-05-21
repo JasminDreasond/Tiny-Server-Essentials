@@ -38,6 +38,15 @@ const insertExpress = (app, http) => {
     }),
   );
 
+  app.get('/js/volume-processor.js', (req, res) =>
+    http.sendFile(res, {
+      file: fs.readFileSync(path.join(__dirname, '../../../dist/client/volume-processor.js')),
+      fileMaxAge: 0,
+      lastModified: new Date(),
+      contentType: 'application/javascript',
+    }),
+  );
+
   app.get('/', (req, res) => {
     console.log(req.ips, req.ip, req.socket?.remoteAddress);
     console.log(http.extractIp(req));
