@@ -25,17 +25,17 @@ const insertSocket = (webSocket) => {
 
     socket.on('mic', (data, metadata) => {
       // data = Blob
-      console.log('mic', data, metadata);
+      io.emit('mic', data, { ...metadata, userId: socket.id });
     });
 
     socket.on('cam', (data, metadata) => {
       // data = Blob
-      console.log('cam', data, metadata);
+      io.emit('cam', data, { ...metadata, userId: socket.id });
     });
 
     socket.on('screen', (data, metadata) => {
       // data = Blob
-      console.log('screen', data, metadata);
+      io.emit('screen', data, { ...metadata, userId: socket.id });
     });
 
     // console.log(req.get('User-Agent'));

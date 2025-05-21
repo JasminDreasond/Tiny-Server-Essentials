@@ -12,7 +12,7 @@ export const micVolumeFilter = (volume) => {
   return volume / 100;
 };
 
-export class VolumeMeter {
+class VolumeMeter {
   #modulePath = '/js/volume-processor.js';
 
   constructor() {
@@ -120,3 +120,5 @@ export class VolumeMeter {
     });
   }
 }
+
+export default VolumeMeter;

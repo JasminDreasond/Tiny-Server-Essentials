@@ -86,8 +86,8 @@
           !isQuiet,
         );
 
-        await manager.startScreen(true, !isQuiet);
         await manager.startCam();
+        await manager.startScreen(true, !isQuiet);
 
         // Lista todos os dispositivos
         await manager.updateDeviceList();
@@ -98,6 +98,32 @@
 
       document.getElementById('active-stream').addEventListener('click', () => startAll(false));
       document.getElementById('active-stream-2').addEventListener('click', () => startAll(true));
+    </script>
+
+    <script>
+      socket.on('mic', (data, metadata) => {
+        const { userId, time } = metadata;
+        const { mime, streamData } = data;
+        const receiver = manager.initReceiver(userId, 'mic', mime, 'audio');
+        receiver.pushChunk(streamData);
+        console.log('mic', data, metadata);
+      });
+
+      socket.on('cam', (data, metadata) => {
+        const { userId, time } = metadata;
+        const { mime, streamData } = data;
+        const receiver = manager.initReceiver(userId, 'cam', mime, 'video');
+        receiver.pushChunk(streamData);
+        console.log('cam', data, metadata);
+      });
+
+      socket.on('screen', (data, metadata) => {
+        const { userId, time } = metadata;
+        const { mime, streamData } = data;
+        const receiver = manager.initReceiver(userId, 'screen', mime, 'video');
+        receiver.pushChunk(streamData);
+        console.log('screen', data, metadata);
+      });
     </script>
   </body>
 </html>

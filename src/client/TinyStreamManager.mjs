@@ -1,11 +1,17 @@
 import { EventEmitter } from 'events';
 import { TinyPromiseQueue } from 'tiny-essentials';
-import { VolumeMeter } from './VolumeMeter.mjs';
+import VolumeMeter from './VolumeMeter.mjs';
+import TinyMediaReceiver from './TinyMediaReceiver.mjs';
+
+/** @typedef {'mic'|'cam'|'screen'} StreamTypes */
+/** @typedef {'Mic'|'Cam'|'Screen'} StreamEventTypes */
 
 /**
  * @typedef {Object} StreamConfig
  * @property {string} mimeType - A valid MIME type for MediaRecorder.
  * @property {number} timeslice - Interval in milliseconds for emitting data chunks.
+ * @property {string|null} audioCodec - Audio codec that can be used
+ * @property {string|null} videoCodec - Video codec that can be used
  */
 
 /**
@@ -88,6 +94,9 @@ export class TinyStreamManager {
   #queue = new TinyPromiseQueue();
   #firstLoad = false;
 
+  /** @type {Map<string, TinyMediaReceiver>} */
+  #streams = new Map();
+
   /**
    * Important instance used to make event emitter.
    * @type {EventEmitter}
@@ -104,41 +113,73 @@ export class TinyStreamManager {
   /**
    * Event labels used internally and externally for stream control and monitoring.
    * These events are emitted or listened to over socket or internal dispatch.
-   *
-   * @type {Record<string, string>}
+   * @readonly
    */
   Events = {
-    /** Event emitted to request starting the webcam stream. */
+    /**
+     * Event emitted to request starting the webcam stream.
+     * @type {'StartCam'}
+     */
     StartCam: 'StartCam',
 
-    /** Event emitted to request starting the microphone stream. */
+    /**
+     * Event emitted to request starting the microphone stream.
+     * @type {'StartMic'}
+     */
     StartMic: 'StartMic',
 
-    /** Event emitted to request starting the screen sharing stream. */
+    /**
+     * Event emitted to request starting the screen sharing stream.
+     * @type {'StartScreen'}
+     */
     StartScreen: 'StartScreen',
 
-    /** Event emitted to request stopping the webcam stream. */
+    /**
+     * Event emitted to request stopping the webcam stream.
+     * @type {'StopCam'}
+     */
     StopCam: 'StopCam',
 
-    /** Event emitted to request stopping the microphone stream. */
+    /**
+     * Event emitted to request stopping the microphone stream.
+     * @type {'StopMic'}
+     */
     StopMic: 'StopMic',
 
-    /** Event emitted to request stopping the screen sharing stream. */
+    /**
+     * Event emitted to request stopping the screen sharing stream.
+     * @type {'StopScreen'}
+     */
     StopScreen: 'StopScreen',
 
-    /** Event emitted when the webcam stream is transmitted. */
+    /**
+     * Event emitted when the webcam stream is transmitted.
+     * @type {'Cam'}
+     */
     Cam: 'Cam',
 
-    /** Event emitted when the microphone stream is transmitted. */
+    /**
+     * Event emitted when the microphone stream is transmitted.
+     * @type {'Mic'}
+     */
     Mic: 'Mic',
 
-    /** Event emitted when the screen sharing stream is transmitted. */
+    /**
+     * Event emitted when the screen sharing stream is transmitted.
+     * @type {'Screen'}
+     */
     Screen: 'Screen',
 
-    /** Event emitted periodically with screen audio volume data. */
+    /**
+     * Event emitted periodically with screen audio volume data.
+     * @type {'ScreenMeter'}
+     */
     ScreenMeter: 'ScreenMeter',
 
-    /** Event emitted periodically with microphone audio volume data. */
+    /**
+     * Event emitted periodically with microphone audio volume data.
+     * @type {'MicMeter'}
+     */
     MicMeter: 'MicMeter',
   };
 
@@ -152,6 +193,7 @@ export class TinyStreamManager {
    * @returns {boolean} Returns `true` if the event exists in the Events map, otherwise `false`.
    */
   existsEvent(name) {
+    // @ts-ignore
     if (typeof this.Events[name] === 'string') return true;
     return false;
   }
@@ -350,7 +392,9 @@ export class TinyStreamManager {
    * @type {StreamConfig}
    */
   #micConfig = {
-    mimeType: 'audio/webm;codecs=opus',
+    mimeType: 'audio/webm',
+    audioCodec: 'opus',
+    videoCodec: null,
     timeslice: 250,
   };
 
@@ -360,7 +404,9 @@ export class TinyStreamManager {
    * @type {StreamConfig}
    */
   #camConfig = {
-    mimeType: 'video/webm;codecs=vp9,opus',
+    mimeType: 'video/webm',
+    audioCodec: null,
+    videoCodec: 'vp9',
     timeslice: 300,
   };
 
@@ -370,14 +416,16 @@ export class TinyStreamManager {
    * @type {StreamConfig}
    */
   #screenConfig = {
-    mimeType: 'video/webm;codecs=vp9,opus',
+    mimeType: 'video/webm',
+    audioCodec: 'opus',
+    videoCodec: 'vp9',
     timeslice: 500,
   };
 
   /**
    * Updates the configuration for a specific media source.
    *
-   * @param {'mic'|'cam'|'screen'} target - The config to update.
+   * @param {StreamTypes} target - The config to update.
    * @param {{ mimeType?: string, timeslice?: number }} updates - The new configuration values.
    *
    * @throws {Error} If the target is invalid.
@@ -614,7 +662,7 @@ export class TinyStreamManager {
    *
    * Use this to manually stop sending a stream over the socket.
    *
-   * @param {string} label - The socket event label associated with the recorder (e.g., 'mic', 'cam', 'screen').
+   * @param {StreamEventTypes} label - The socket event label associated with the recorder (e.g., 'mic', 'cam', 'screen').
    */
   #stopSocketStream(label) {
     const recorder = this.#recorders.get(label);
@@ -628,9 +676,9 @@ export class TinyStreamManager {
    * Internal helper to detect when media tracks end, and stop the corresponding socket stream.
    *
    * @param {MediaStream} stream - The media stream being monitored.
-   * @param {string} label - The socket label to stop when the stream ends.
+   * @param {StreamEventTypes} label - The socket label to stop when the stream ends.
    */
-  #stopDeviceDetector(stream, label = '') {
+  #stopDeviceDetector(stream, label) {
     if (!(stream instanceof MediaStream)) return;
     stream.getTracks().forEach((track) => {
       track.addEventListener(
@@ -685,7 +733,12 @@ export class TinyStreamManager {
     this.micMeter.connectToSource(stream, hearVoice);
     this.#startMonitorInterval();
     this.#emit(this.Events.StartMic);
-    this.#sendStreamOverSocket(stream, this.Events.Mic, this.#micConfig);
+    this.#sendStreamOverSocket(
+      stream,
+      { audio: true, video: false },
+      this.Events.Mic,
+      this.#micConfig,
+    );
     return stream;
   }
 
@@ -721,7 +774,12 @@ export class TinyStreamManager {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     this.camStream = stream;
     this.#emit(this.Events.StartCam);
-    this.#sendStreamOverSocket(stream, this.Events.Cam, this.#camConfig);
+    this.#sendStreamOverSocket(
+      stream,
+      { audio: false, video: true },
+      this.Events.Cam,
+      this.#camConfig,
+    );
     return stream;
   }
 
@@ -763,7 +821,12 @@ export class TinyStreamManager {
 
     this.#startMonitorInterval();
     this.#emit(this.Events.StartScreen);
-    this.#sendStreamOverSocket(stream, this.Events.Screen, this.#screenConfig);
+    this.#sendStreamOverSocket(
+      stream,
+      { audio: hasAudio, video: true },
+      this.Events.Screen,
+      this.#screenConfig,
+    );
     return stream;
   }
 
@@ -776,10 +839,9 @@ export class TinyStreamManager {
    * It will not start a new recorder if one is already active for the given label.
    *
    * @param {MediaStream} stream - The media stream to send. Must be a valid MediaStream instance.
-   * @param {string} label - The socket channel label used to identify the stream (e.g., 'mic', 'cam', 'screen').
-   * @param {Object} [options={}] - Optional settings for recording.
-   * @param {string} [options.mimeType='video/webm;codecs=vp9,opus'] - The MIME type used by MediaRecorder.
-   * @param {number} [options.timeslice=100] - The interval (in ms) for emitting recorded data chunks.
+   * @param {{ audio: boolean; video: boolean; }} allowCodecs - The codecs that are allowed to use.
+   * @param {StreamEventTypes} label - The socket channel label used to identify the stream (e.g., 'mic', 'cam', 'screen').
+   * @param {StreamConfig} options - Settings for recording.
    *
    * @throws {Error} If the stream is not a valid MediaStream.
    * @throws {Error} If a recorder is already active for the given label.
@@ -787,14 +849,15 @@ export class TinyStreamManager {
    * @throws {Error} If timeslice is not a positive number.
    * @throws {DOMException} If the MediaRecorder cannot be created with the given stream and options.
    */
-  #sendStreamOverSocket(stream, label, options = {}) {
+  #sendStreamOverSocket(stream, allowCodecs = { audio: true, video: true }, label, options) {
+    if (typeof label !== 'string') throw new Error('Parameter "label" must be a valid string.');
     if (!(stream instanceof MediaStream))
       throw new Error('Parameter "stream" must be a valid MediaStream instance.');
 
     if (this.#recorders.has(label))
       throw new Error(`A recorder for "${label}" is already running.`);
 
-    const mime = options.mimeType;
+    const mime = `${options.mimeType};codecs=${allowCodecs.video ? options.videoCodec : ''}${allowCodecs.video && allowCodecs.audio ? `,` : ''}${allowCodecs.audio ? options.audioCodec : ''}`;
     const timeslice = options.timeslice ?? 100;
 
     if (typeof mime !== 'string' || !MediaRecorder.isTypeSupported(mime))
@@ -805,7 +868,7 @@ export class TinyStreamManager {
     const recorder = new MediaRecorder(stream, { mimeType: mime });
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.#emit(label, e.data);
+      if (e.data.size > 0) this.#emit(label, { streamData: e.data, mime });
     };
 
     recorder.start(timeslice);
@@ -870,5 +933,91 @@ export class TinyStreamManager {
     this.stopMic();
     this.stopCam();
     this.stopScreen();
+  }
+
+  /**
+   * Generates a unique media identifier string based on the given parameters.
+   *
+   * @param {string} userId - The ID of the user.
+   * @param {string} type - The type/category of the media.
+   * @param {string} mime - The MIME type of the media.
+   * @param {string} elementName - The name of the media element.
+   * @returns {string} A concatenated string uniquely identifying the media.
+   */
+  #getMediaId(userId, type, mime, elementName) {
+    if (typeof userId !== 'string') throw new Error('userId must be a string.');
+    if (typeof type !== 'string') throw new Error('type must be a string.');
+    if (typeof mime !== 'string') throw new Error('mime must be a string.');
+    if (typeof elementName !== 'string') throw new Error('elementName must be a string.');
+    if (elementName !== 'audio' && elementName !== 'video')
+      throw new Error("elementName must be either 'audio' or 'video'.");
+    if (!['mic', 'cam', 'screen'].includes(type)) throw new Error(`Invalid config type: "${type}"`);
+    return `${userId}:${type}:${mime}:${elementName}`;
+  }
+
+  /**
+   * Checks if a media receiver exists for the given stream parameters.
+   *
+   * @param {string} userId - The user id to attach the stream.
+   * @param {string} type - The stream type, e.g., 'mic'.
+   * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @returns {boolean}
+   */
+  hasReceiver(userId, type, mime, elementName) {
+    const id = this.#getMediaId(userId, type, mime, elementName);
+    return this.#streams.has(id);
+  }
+
+  /**
+   * Deletes a media receiver.
+   *
+   * @param {string} userId - The user id to attach the stream.
+   * @param {string} type - The stream type, e.g., 'mic'.
+   * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   */
+  deleteReceiver(userId, type, mime, elementName) {
+    const id = this.#getMediaId(userId, type, mime, elementName);
+    if (!this.#streams.has(id)) throw new Error('');
+    const receiver = this.#streams.get(id);
+    receiver?.destroy();
+    this.#streams.delete(id);
+  }
+
+  /**
+   * Gets a media player for continuous streaming from received chunks.
+   *
+   * @param {string} userId - The user id to attach the stream.
+   * @param {string} type - The stream type, e.g., 'mic'.
+   * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @returns {TinyMediaReceiver} - If the instance has not yet been created, it will be created automatically.
+   * @throws {Error} If no media receiver exists for the given parameters.
+   */
+  getReceiver(userId, type, mime, elementName) {
+    const id = this.#getMediaId(userId, type, mime, elementName);
+    const oldReceiver = this.#streams.get(id);
+    if (oldReceiver) return oldReceiver;
+    throw new Error(`No media receiver found for ID "${id}"`);
+  }
+
+  /**
+   * Initializes a media player for continuous streaming from received chunks.
+   *
+   * @param {string} userId - The user id to attach the stream.
+   * @param {StreamTypes} type - The stream type, e.g., 'mic'.
+   * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @returns {TinyMediaReceiver} - If the instance has not yet been created, it will be created automatically.
+   */
+  initReceiver(userId, type, mime, elementName) {
+    const id = this.#getMediaId(userId, type, mime, elementName);
+    const oldReceiver = this.#streams.get(id);
+    if (oldReceiver) return oldReceiver;
+
+    const receiver = new TinyMediaReceiver(elementName, mime);
+    this.#streams.set(id, receiver);
+    return receiver;
   }
 }
