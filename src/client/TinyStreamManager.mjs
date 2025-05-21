@@ -117,6 +117,20 @@ export class TinyStreamManager {
    */
   Events = {
     /**
+     * Emitted when a media data receiver (e.g., WebSocket, PeerConnection, etc.) has been removed.
+     * This may happen when a connection is closed or explicitly terminated.
+     * @type {'ReceiverDeleted'}
+     */
+    ReceiverDeleted: 'ReceiverDeleted',
+
+    /**
+     * Emitted when a new media data receiver has been added to the stream.
+     * Useful for dynamic systems where receivers can join at runtime.
+     * @type {'ReceiverAdded'}
+     */
+    ReceiverAdded: 'ReceiverAdded',
+
+    /**
      * Event emitted to request starting the webcam stream.
      * @type {'StartCam'}
      */
@@ -310,6 +324,86 @@ export class TinyStreamManager {
   removeListener(event, listener) {
     this.#events.removeListener(event, listener);
     return this;
+  }
+
+  /**
+   * Removes all listeners for a specific event, or all events if no event is specified.
+   * @param {string | symbol} [event] - The name of the event. If omitted, all listeners from all events will be removed.
+   * @returns {this} The current class instance (for chaining).
+   */
+  removeAllListeners(event) {
+    this.#events.removeAllListeners(event);
+    return this;
+  }
+
+  /**
+   * Returns the number of times the given `listener` is registered for the specified `event`.
+   * If no `listener` is passed, returns how many listeners are registered for the `event`.
+   * @param {string | symbol} eventName - The name of the event.
+   * @param {Function} [listener] - Optional listener function to count.
+   * @returns {number} Number of matching listeners.
+   */
+  listenerCount(eventName, listener) {
+    return this.#events.listenerCount(eventName, listener);
+  }
+
+  /**
+   * Adds a listener function to the **beginning** of the listeners array for the specified event.
+   * The listener is called every time the event is emitted.
+   * @param {string | symbol} eventName - The event name.
+   * @param {ListenerCallback} listener - The callback function.
+   * @returns {this} The current class instance (for chaining).
+   */
+  prependListener(eventName, listener) {
+    this.#events.prependListener(eventName, listener);
+    return this;
+  }
+
+  /**
+   * Adds a **one-time** listener function to the **beginning** of the listeners array.
+   * The next time the event is triggered, this listener is removed and then invoked.
+   * @param {string | symbol} eventName - The event name.
+   * @param {ListenerCallback} listener - The callback function.
+   * @returns {this} The current class instance (for chaining).
+   */
+  prependOnceListener(eventName, listener) {
+    this.#events.prependOnceListener(eventName, listener);
+    return this;
+  }
+
+  /**
+   * Returns an array of event names for which listeners are currently registered.
+   * @returns {(string | symbol)[]} Array of event names.
+   */
+  eventNames() {
+    return this.#events.eventNames();
+  }
+
+  /**
+   * Gets the current maximum number of listeners allowed for any single event.
+   * @returns {number} The max listener count.
+   */
+  getMaxListeners() {
+    return this.#events.getMaxListeners();
+  }
+
+  /**
+   * Returns a copy of the listeners array for the specified event.
+   * @param {string | symbol} eventName - The event name.
+   * @returns {Function[]} An array of listener functions.
+   */
+  listeners(eventName) {
+    return this.#events.listeners(eventName);
+  }
+
+  /**
+   * Returns a copy of the internal listeners array for the specified event,
+   * including wrapper functions like those used by `.once()`.
+   * @param {string | symbol} eventName - The event name.
+   * @returns {Function[]} An array of raw listener functions.
+   */
+  rawListeners(eventName) {
+    return this.#events.rawListeners(eventName);
   }
 
   /**
@@ -983,6 +1077,7 @@ export class TinyStreamManager {
     const receiver = this.#streams.get(id);
     receiver?.destroy();
     this.#streams.delete(id);
+    this.#emit(this.Events.ReceiverDeleted, { userId, type, mime, elementName }, receiver);
   }
 
   /**
@@ -1018,6 +1113,29 @@ export class TinyStreamManager {
 
     const receiver = new TinyMediaReceiver(elementName, mime);
     this.#streams.set(id, receiver);
+    this.#emit(this.Events.ReceiverAdded, { userId, type, mime, elementName }, receiver);
     return receiver;
+  }
+
+  /**
+   * Destroys the instance by terminating all active streams, stopping processes, and removing all event listeners.
+   *
+   * This method performs a full cleanup of the instance. It first iterates through all entries in `#streams` and calls
+   * their `destroy()` methods to properly dispose of any underlying resources (e.g., sockets, file handles, etc.). After that,
+   * it clears the `#streams` map entirely. It also calls `stopAll()` to terminate any ongoing operations or processes,
+   * and finally removes all listeners from both `#events` and `#sysEvents` to avoid memory leaks or unintended side effects.
+   *
+   * Call this method when the instance is no longer needed or before disposing of it.
+   *
+   * @returns {void}
+   */
+  destroy() {
+    this.#streams.forEach((value) => {
+      value.destroy();
+    });
+    this.#streams.clear();
+    this.stopAll();
+    this.#events.removeAllListeners();
+    this.#sysEvents.removeAllListeners();
   }
 }

@@ -35,6 +35,8 @@
       <div id="progressBar"></div>
     </div>
 
+    <div id="players"></div>
+
     <script>
       const socket = io('http://localhost:3050');
       const manager = new TinyStreamManager();
@@ -101,12 +103,34 @@
     </script>
 
     <script>
+      const players = document.getElementById('players');
+
+      manager.on(manager.Events.ReceiverAdded, (metadata, receiver) => {
+        const { userId, type, mime, elementName } = metadata;
+
+        console.log('Receiver Added', metadata);
+        receiver.on(receiver.Events.Error, (err) => {
+          console.warn(`New error detected! ${userId} ${type} ${mime} ${elementName}`, err);
+        });
+
+        receiver.on(receiver.Events.SourceOpen, () => {
+          console.log(`Source Open ${userId} ${type} ${mime} ${elementName}`);
+        });
+
+        receiver.on(receiver.Events.FeedQueue, (chuck) => {
+          console.log(`Feed Queue ${userId} ${type} ${mime} ${elementName}`, chuck);
+        });
+      });
+
+      manager.on(manager.Events.ReceiverDeleted, (metadata) => {
+        console.log('Receiver Deleted', metadata);
+      });
+
       socket.on('mic', (data, metadata) => {
         const { userId, time } = metadata;
         const { mime, streamData } = data;
         const receiver = manager.initReceiver(userId, 'mic', mime, 'audio');
         receiver.pushChunk(streamData);
-        console.log('mic', data, metadata);
       });
 
       socket.on('cam', (data, metadata) => {
@@ -114,7 +138,6 @@
         const { mime, streamData } = data;
         const receiver = manager.initReceiver(userId, 'cam', mime, 'video');
         receiver.pushChunk(streamData);
-        console.log('cam', data, metadata);
       });
 
       socket.on('screen', (data, metadata) => {
@@ -122,7 +145,6 @@
         const { mime, streamData } = data;
         const receiver = manager.initReceiver(userId, 'screen', mime, 'video');
         receiver.pushChunk(streamData);
-        console.log('screen', data, metadata);
       });
     </script>
   </body>
