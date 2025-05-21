@@ -339,6 +339,14 @@ class TinyMediaReceiver {
   }
 
   /**
+   * Alias for `pushChunk`.
+   * @param {ArrayBuffer} buffer
+   */
+  push(buffer) {
+    return this.pushChunk(buffer);
+  }
+
+  /**
    * Finalizes the media stream and releases resources.
    */
   destroy() {
