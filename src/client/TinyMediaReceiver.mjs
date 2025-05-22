@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
 
+/** @typedef {'video'|'audio'|HTMLVideoElement|HTMLAudioElement} ReceiverTags */
+
 class TinyMediaReceiver {
   /**
    * Important instance used to make event emitter.
@@ -278,32 +280,36 @@ class TinyMediaReceiver {
   }
 
   _feedQueue() {
-    if (!this.sourceBuffer) return;
-    if (this.queue.length === 0 || this.sourceBuffer.updating) return;
-
+    if (!this.sourceBuffer || this.queue.length === 0 || this.sourceBuffer.updating) return;
     const chunk = this.queue.shift();
-    if (this.sourceBuffer) {
-      try {
-        this.#emit(this.Events.FeedQueue, chunk);
-        // @ts-ignore
-        this.sourceBuffer.appendBuffer(chunk);
-      } catch (e) {
-        console.error('Failed to append buffer:', e);
-        this.#emit(this.Events.Error, e);
-        this.destroy();
-      }
+    try {
+      this.#emit(this.Events.FeedQueue, chunk);
+      // @ts-ignore
+      this.sourceBuffer.appendBuffer(chunk);
+      if (this.queue.length > 0) this._feedQueue();
+    } catch (e) {
+      console.error('Failed to append buffer:', e);
+      this.#emit(this.Events.Error, e);
+      this.destroy();
     }
+  }
+
+  async _cleanupBuffer() {
+    
   }
 
   /**
    * Initializes a media player for continuous streaming from received chunks.
    *
-   * @param {'video'|'audio'|HTMLVideoElement|HTMLAudioElement} element - The tag to attach the stream.
+   * @param {ReceiverTags} element - The tag to attach the stream.
    * @param {string} mimeType - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {number} [maxBufferBack=30] - Maximum buffer back to keep in the buffer behind the current time.
    */
-  constructor(element, mimeType) {
+  constructor(element, mimeType, maxBufferBack = 30) {
     if (!MediaSource.isTypeSupported(mimeType))
       throw new Error(`MIME type not supported: ${mimeType}`);
+    if (!Number.isInteger(maxBufferBack) || maxBufferBack <= 0)
+      throw new Error('Expected a positive number in maxBufferBack.');
 
     this.mimeType = mimeType;
     /** @type {BufferSource[]} */
@@ -312,6 +318,7 @@ class TinyMediaReceiver {
     this.mediaSource = new MediaSource();
     this.isBufferUpdating = false;
     this.isEnded = false;
+    this.maxBufferBack = maxBufferBack;
 
     if (typeof element === 'string') {
       if (element !== 'audio' && element !== 'video')
@@ -322,10 +329,35 @@ class TinyMediaReceiver {
 
     this.#element.src = this.#url;
     this.#element.src = URL.createObjectURL(this.mediaSource);
-
     this.mediaSource.addEventListener('sourceopen', () => {
       this._onSourceOpen();
     });
+
+    setInterval(() => this._cleanupBuffer(), 5000);
+  }
+
+  /**
+   * Gets the maximum buffer back.
+   * Only returns a positive integer.
+   * @returns {number}
+   */
+  getMaxBufferBack() {
+    if (!Number.isInteger(this.maxBufferBack) || this.maxBufferBack <= 0)
+      throw new Error(
+        `[MediaStream] Invalid internal maxBufferBack detected (${this.maxBufferBack}), resetting to 30.`,
+      );
+    return this.maxBufferBack;
+  }
+
+  /**
+   * Sets the maximum buffer back.
+   * Value must be a positive integer.
+   * @param {number} value
+   */
+  setMaxBufferBack(value) {
+    if (!Number.isInteger(value) || value <= 0)
+      throw new Error(`[MediaStream] maxBufferBack must be a positive integer. Received: ${value}`);
+    this.maxBufferBack = value;
   }
 
   /** @returns {HTMLMediaElement} */
@@ -340,7 +372,7 @@ class TinyMediaReceiver {
    * @param {ArrayBuffer} buffer
    */
   pushChunk(buffer) {
-    if (this.isEnded) return;
+    if (this.isEnded) return new Promise((resolve) => resolve(undefined));
     this.queue.push(buffer);
     this._feedQueue();
   }
@@ -357,7 +389,7 @@ class TinyMediaReceiver {
    * Finalizes the media stream and releases resources.
    */
   destroy() {
-    if (this.mediaSource.readyState === 'open') {
+    if (!this.isEnded && this.mediaSource.readyState === 'open') {
       this.isEnded = true;
       const tryEnd = () => {
         if (!this.sourceBuffer) throw new Error('No sourcerBuffer');

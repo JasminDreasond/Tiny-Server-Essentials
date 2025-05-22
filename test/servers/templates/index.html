@@ -35,20 +35,37 @@
       <div id="progressBar"></div>
     </div>
 
-    <div id="players"></div>
+    <div id="players">
+      <h2>Video Stream Test</h2>
+      <video id="videoTest" width="640" height="360" controls autoplay muted>
+        Your browser does not support the video tag.
+      </video>
+
+      <h2>Audio Stream Test</h2>
+      <audio id="audioTest" controls autoplay>
+        Your browser does not support the audio tag.
+      </audio>
+
+      <h2>Screen Sharing Video</h2>
+      <video id="screenVideo" width="800" height="450" autoplay playsinline controls></video>
+    </div>
 
     <script>
+      // Server
       const socket = io('http://localhost:3050');
       const manager = new TinyStreamManager();
 
+      // Mic
       manager.on(manager.Events.Mic, (data, metadata) =>
         socket.emit('mic', data, { time: Date.now() }),
       );
 
+      // Cam
       manager.on(manager.Events.Cam, (data, metadata) =>
         socket.emit('cam', data, { time: Date.now() }),
       );
 
+      // Screen
       manager.on(manager.Events.Screen, (data, metadata) =>
         socket.emit('screen', data, { time: Date.now() }),
       );
@@ -57,22 +74,6 @@
         const progressBar = document.getElementById('progressBar');
         progressBar.style.width = Number(data.perc) + '%';
       });
-
-      async function getDevices() {
-        await manager.updateDeviceList();
-        const micList = document.getElementById('micList');
-        const mics = manager.getDevicesByKind('audio');
-        mics.forEach((device) => {
-          const opt = document.createElement('option');
-          opt.value = device.deviceId;
-          opt.textContent = device.label || `Microphone (${device.deviceId})`;
-          micList.appendChild(opt);
-        });
-
-        console.log(manager.getDevicesByKind('audio'));
-        console.log(manager.getDevicesByKind('video'));
-        console.log(manager.getDevicesByKind('speaker'));
-      }
 
       async function startAll(isQuiet = false) {
         console.log(!isQuiet);
@@ -89,7 +90,7 @@
         );
 
         await manager.startCam();
-        await manager.startScreen(true, !isQuiet);
+        // await manager.startScreen(true, !isQuiet);
 
         // Lista todos os dispositivos
         await manager.updateDeviceList();
@@ -98,12 +99,22 @@
         console.table(manager.getDevicesByKind('speaker'));
       }
 
+      // Active stream buttons
       document.getElementById('active-stream').addEventListener('click', () => startAll(false));
       document.getElementById('active-stream-2').addEventListener('click', () => startAll(true));
     </script>
 
     <script>
-      const players = document.getElementById('players');
+      // Tags
+      const video = document.getElementById('videoTest');
+      const audio = document.getElementById('audioTest');
+      const screenVideo = document.getElementById('screenVideo');
+
+      // Exemplo: Loga eventos para testes
+      video.addEventListener('play', () => console.log('Video started'));
+      video.addEventListener('pause', () => console.log('Video paused'));
+      audio.addEventListener('play', () => console.log('Audio started'));
+      audio.addEventListener('pause', () => console.log('Audio paused'));
 
       manager.on(manager.Events.ReceiverAdded, (metadata, receiver) => {
         const { userId, type, mime, elementName } = metadata;
@@ -129,21 +140,21 @@
       socket.on('mic', (data, metadata) => {
         const { userId, time } = metadata;
         const { mime, streamData } = data;
-        const receiver = manager.initReceiver(userId, 'mic', mime, 'audio');
+        const receiver = manager.initReceiver(userId, 'mic', mime, audio);
         receiver.pushChunk(streamData);
       });
 
       socket.on('cam', (data, metadata) => {
         const { userId, time } = metadata;
         const { mime, streamData } = data;
-        const receiver = manager.initReceiver(userId, 'cam', mime, 'video');
+        const receiver = manager.initReceiver(userId, 'cam', mime, video);
         receiver.pushChunk(streamData);
       });
 
       socket.on('screen', (data, metadata) => {
         const { userId, time } = metadata;
         const { mime, streamData } = data;
-        const receiver = manager.initReceiver(userId, 'screen', mime, 'video');
+        const receiver = manager.initReceiver(userId, 'screen', mime, screenVideo);
         receiver.pushChunk(streamData);
       });
     </script>

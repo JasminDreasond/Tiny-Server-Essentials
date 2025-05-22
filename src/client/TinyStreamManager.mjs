@@ -5,6 +5,7 @@ import TinyMediaReceiver from './TinyMediaReceiver.mjs';
 
 /** @typedef {'mic'|'cam'|'screen'} StreamTypes */
 /** @typedef {'Mic'|'Cam'|'Screen'} StreamEventTypes */
+/** @typedef {import('./TinyMediaReceiver.mjs').ReceiverTags} ReceiverTags */
 
 /**
  * @typedef {Object} StreamConfig
@@ -496,7 +497,7 @@ export class TinyStreamManager {
     mimeType: 'audio/webm',
     audioCodec: 'opus',
     videoCodec: null,
-    timeslice: 250,
+    timeslice: 100,
   };
 
   /**
@@ -508,7 +509,7 @@ export class TinyStreamManager {
     mimeType: 'video/webm',
     audioCodec: null,
     videoCodec: 'vp9',
-    timeslice: 300,
+    timeslice: 100,
   };
 
   /**
@@ -520,7 +521,7 @@ export class TinyStreamManager {
     mimeType: 'video/webm',
     audioCodec: 'opus',
     videoCodec: 'vp9',
-    timeslice: 500,
+    timeslice: 100,
   };
 
   /**
@@ -1042,18 +1043,21 @@ export class TinyStreamManager {
    * @param {string} userId - The ID of the user.
    * @param {string} type - The type/category of the media.
    * @param {string} mime - The MIME type of the media.
-   * @param {string} elementName - The name of the media element.
+   * @param {ReceiverTags} element - The name of the media element.
    * @returns {string} A concatenated string uniquely identifying the media.
    */
-  #getMediaId(userId, type, mime, elementName) {
+  getMediaId(userId, type, mime, element) {
     if (typeof userId !== 'string') throw new Error('userId must be a string.');
     if (typeof type !== 'string') throw new Error('type must be a string.');
     if (typeof mime !== 'string') throw new Error('mime must be a string.');
-    if (typeof elementName !== 'string') throw new Error('elementName must be a string.');
-    if (elementName !== 'audio' && elementName !== 'video')
-      throw new Error("elementName must be either 'audio' or 'video'.");
+    // @ts-ignore
+    if (!(element instanceof HTMLMediaElement) && typeof element !== 'string')
+      throw new Error("element must be either 'string' or 'HTMLMediaElement'.");
+    if (typeof element === 'string' && !['video', 'audio'].includes(element))
+      throw new Error("element must be either 'audio' or 'video'.");
     if (!['mic', 'cam', 'screen'].includes(type)) throw new Error(`Invalid config type: "${type}"`);
-    return `${userId}:${type}:${mime}:${elementName}`;
+    // @ts-ignore
+    return `${userId}:${type}:${mime}:${typeof element === 'string' ? element : element.tagName}`;
   }
 
   /**
@@ -1062,11 +1066,11 @@ export class TinyStreamManager {
    * @param {string} userId - The user id to attach the stream.
    * @param {string} type - The stream type, e.g., 'mic'.
    * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
-   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @param {ReceiverTags} element - The tag name needs to be `audio` or `video` to attach the stream.
    * @returns {boolean}
    */
-  hasReceiver(userId, type, mime, elementName) {
-    const id = this.#getMediaId(userId, type, mime, elementName);
+  hasReceiver(userId, type, mime, element) {
+    const id = this.getMediaId(userId, type, mime, element);
     return this.#streams.has(id);
   }
 
@@ -1076,15 +1080,15 @@ export class TinyStreamManager {
    * @param {string} userId - The user id to attach the stream.
    * @param {string} type - The stream type, e.g., 'mic'.
    * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
-   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @param {ReceiverTags} element - The tag name needs to be `audio` or `video` to attach the stream.
    */
-  deleteReceiver(userId, type, mime, elementName) {
-    const id = this.#getMediaId(userId, type, mime, elementName);
+  deleteReceiver(userId, type, mime, element) {
+    const id = this.getMediaId(userId, type, mime, element);
     if (!this.#streams.has(id)) throw new Error('');
     const receiver = this.#streams.get(id);
     receiver?.destroy();
     this.#streams.delete(id);
-    this.#emit(this.Events.ReceiverDeleted, { userId, type, mime, elementName }, receiver);
+    this.#emit(this.Events.ReceiverDeleted, { userId, type, mime, element }, receiver);
   }
 
   /**
@@ -1093,12 +1097,12 @@ export class TinyStreamManager {
    * @param {string} userId - The user id to attach the stream.
    * @param {string} type - The stream type, e.g., 'mic'.
    * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
-   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @param {ReceiverTags} element - The tag name needs to be `audio` or `video` to attach the stream.
    * @returns {TinyMediaReceiver} - If the instance has not yet been created, it will be created automatically.
    * @throws {Error} If no media receiver exists for the given parameters.
    */
-  getReceiver(userId, type, mime, elementName) {
-    const id = this.#getMediaId(userId, type, mime, elementName);
+  getReceiver(userId, type, mime, element) {
+    const id = this.getMediaId(userId, type, mime, element);
     const oldReceiver = this.#streams.get(id);
     if (oldReceiver) return oldReceiver;
     throw new Error(`No media receiver found for ID "${id}"`);
@@ -1110,17 +1114,18 @@ export class TinyStreamManager {
    * @param {string} userId - The user id to attach the stream.
    * @param {StreamTypes} type - The stream type, e.g., 'mic'.
    * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
-   * @param {'video'|'audio'} elementName - The tag name needs to be `audio` or `video` to attach the stream.
+   * @param {ReceiverTags} element - The tag name needs to be `audio` or `video` to attach the stream.
+   * @param {number} [maxBufferBack=30] - Maximum buffer back to keep in the buffer behind the current time.
    * @returns {TinyMediaReceiver} - If the instance has not yet been created, it will be created automatically.
    */
-  initReceiver(userId, type, mime, elementName) {
-    const id = this.#getMediaId(userId, type, mime, elementName);
+  initReceiver(userId, type, mime, element, maxBufferBack = 30) {
+    const id = this.getMediaId(userId, type, mime, element);
     const oldReceiver = this.#streams.get(id);
     if (oldReceiver) return oldReceiver;
 
-    const receiver = new TinyMediaReceiver(elementName, mime);
+    const receiver = new TinyMediaReceiver(element, mime, maxBufferBack);
     this.#streams.set(id, receiver);
-    this.#emit(this.Events.ReceiverAdded, { userId, type, mime, elementName }, receiver);
+    this.#emit(this.Events.ReceiverAdded, { userId, type, mime, element }, receiver);
     return receiver;
   }
 
