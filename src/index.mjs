@@ -13,8 +13,8 @@ import TinyIo from './Io.mjs';
  * ```js
  * import TinyWebEssentials from 'tiny-server-essentials';
  *
- * const app = TinyWebEssentials.Express();
- * const io = TinyWebEssentials.Io();
+ * const server1 = TinyWebEssentials.Express();
+ * const server2 = TinyWebEssentials.Io();
  * const instance = new TinyWebEssentials.Instance();
  * ```
  */
