@@ -1115,10 +1115,10 @@ export class TinyStreamManager {
    * @param {StreamTypes} type - The stream type, e.g., 'mic'.
    * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
    * @param {ReceiverTags} element - The tag name needs to be `audio` or `video` to attach the stream.
-   * @param {number} [maxBufferBack=30] - Maximum buffer back to keep in the buffer behind the current time.
+   * @param {number} [maxBufferBack=10] - Maximum buffer back to keep in the buffer behind the current time.
    * @returns {TinyMediaReceiver} - If the instance has not yet been created, it will be created automatically.
    */
-  initReceiver(userId, type, mime, element, maxBufferBack = 30) {
+  initReceiver(userId, type, mime, element, maxBufferBack = 10) {
     const id = this.getMediaId(userId, type, mime, element);
     const oldReceiver = this.#streams.get(id);
     if (oldReceiver) return oldReceiver;

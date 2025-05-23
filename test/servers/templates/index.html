@@ -42,9 +42,7 @@
       </video>
 
       <h2>Audio Stream Test</h2>
-      <audio id="audioTest" controls autoplay>
-        Your browser does not support the audio tag.
-      </audio>
+      <audio id="audioTest" controls autoplay>Your browser does not support the audio tag.</audio>
 
       <h2>Screen Sharing Video</h2>
       <video id="screenVideo" width="800" height="450" autoplay playsinline controls></video>
@@ -128,9 +126,9 @@
           console.log(`Source Open ${userId} ${type} ${mime} ${elementName}`);
         });
 
-        receiver.on(receiver.Events.FeedQueue, (chuck) => {
+        /** receiver.on(receiver.Events.FeedQueue, (chuck) => {
           console.log(`Feed Queue ${userId} ${type} ${mime} ${elementName}`, chuck);
-        });
+        }); */
       });
 
       manager.on(manager.Events.ReceiverDeleted, (metadata) => {

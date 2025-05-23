@@ -23,6 +23,20 @@ class TinyMediaReceiver {
    */
   Events = {
     /**
+     * Emitted when the buffer has been successfully cleaned.
+     * Useful for freeing up memory or managing playback state.
+     * @type {'BufferCleaned'}
+     */
+    BufferCleaned: 'BufferCleaned',
+
+    /**
+     * Emitted to synchronize the playback time, typically used
+     * when aligning multiple streams or correcting drift.
+     * @type {'SyncTime'}
+     */
+    SyncTime: 'SyncTime',
+
+    /**
      * Event name emitted when the instance is destroyed.
      * This constant can be used to subscribe to the destruction event of the instance.
      * @type {'Destroyed'}
@@ -294,8 +308,42 @@ class TinyMediaReceiver {
     }
   }
 
-  async _cleanupBuffer() {
-    
+  _cleanupBuffer() {
+    if (!this.sourceBuffer || !this.#element) return;
+    if (!this.sourceBuffer.buffered || this.sourceBuffer.updating) return;
+
+    const media = this.#element;
+    const buffered = this.sourceBuffer.buffered;
+    const maxBack = this.getMaxBufferBack();
+    const tolerance = 0.1;
+
+    if (buffered.length === 0) return;
+
+    const bufferStart = buffered.start(0);
+    const bufferEnd = buffered.end(buffered.length - 1);
+    const bufferedDuration = bufferEnd - bufferStart;
+
+    // Cleans only if the buffer total exceeds the limit
+    if (bufferedDuration > maxBack + tolerance) {
+      const extra = bufferedDuration - maxBack;
+      const removeEnd = bufferStart + extra;
+
+      try {
+        this.sourceBuffer.remove(bufferStart, removeEnd);
+        this.#emit?.(this.Events.BufferCleaned, { from: bufferStart, to: removeEnd });
+      } catch (e) {
+        console.warn('Failed to clean buffer range:', e);
+      }
+    }
+
+    // Fixes currentTime if it leaves the allowed range
+    const idealTime = bufferEnd - 0.1;
+    const minTime = bufferEnd - maxBack;
+
+    if (media.currentTime < minTime + tolerance || media.currentTime > bufferEnd - tolerance) {
+      media.currentTime = idealTime;
+      this.#emit?.(this.Events.SyncTime, idealTime);
+    }
   }
 
   /**
@@ -303,9 +351,9 @@ class TinyMediaReceiver {
    *
    * @param {ReceiverTags} element - The tag to attach the stream.
    * @param {string} mimeType - The mime type, e.g., 'audio/webm;codecs=opus'.
-   * @param {number} [maxBufferBack=30] - Maximum buffer back to keep in the buffer behind the current time.
+   * @param {number} [maxBufferBack=10] - Maximum buffer back to keep in the buffer behind the current time.
    */
-  constructor(element, mimeType, maxBufferBack = 30) {
+  constructor(element, mimeType, maxBufferBack = 10) {
     if (!MediaSource.isTypeSupported(mimeType))
       throw new Error(`MIME type not supported: ${mimeType}`);
     if (!Number.isInteger(maxBufferBack) || maxBufferBack <= 0)
@@ -333,7 +381,7 @@ class TinyMediaReceiver {
       this._onSourceOpen();
     });
 
-    setInterval(() => this._cleanupBuffer(), 5000);
+    setInterval(() => this._cleanupBuffer(), 100);
   }
 
   /**
