@@ -45,7 +45,7 @@
       <audio id="audioTest" controls autoplay>Your browser does not support the audio tag.</audio>
 
       <h2>Screen Sharing Video</h2>
-      <video id="screenVideo" width="800" height="450" autoplay playsinline controls></video>
+      <video id="screenVideo" width="800" height="450" autoplay controls></video>
     </div>
 
     <script>
@@ -88,7 +88,7 @@
         );
 
         await manager.startCam();
-        // await manager.startScreen(true, !isQuiet);
+        await manager.startScreen(true, !isQuiet);
 
         // Lista todos os dispositivos
         await manager.updateDeviceList();

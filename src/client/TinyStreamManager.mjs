@@ -515,13 +515,19 @@ export class TinyStreamManager {
   /**
    * Configuration used for screen streaming.
    *
+   * Framerate (FPS)	Timeslice
+   * 60 FPS	          ~16.6 ms
+   * 30 FPS	          ~33.3 ms
+   * 15 FPS	          ~66.6 ms
+   * 10 FPS           ~100 ms
+   *
    * @type {StreamConfig}
    */
   #screenConfig = {
     mimeType: 'video/webm',
     audioCodec: 'opus',
     videoCodec: 'vp9',
-    timeslice: 100,
+    timeslice: 500,
   };
 
   /**
