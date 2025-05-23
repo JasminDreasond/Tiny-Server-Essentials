@@ -11,12 +11,11 @@ import TinyIo from './Io.mjs';
  *
  * Example:
  * ```js
- * import { TinyWebEssentials } from 'tiny-web';
+ * import TinyWebEssentials from 'tiny-server-essentials';
  *
- * const app = TinyWebEssentials.Express.createApp();
- * const io = TinyWebEssentials.Io.createServer(app.server);
- * const instance = new TinyWebEssentials.Instance(app.server);
- * const ips = TinyWebEssentials.Utils.extractIpList(req.ip);
+ * const app = TinyWebEssentials.Express();
+ * const io = TinyWebEssentials.Io();
+ * const instance = new TinyWebEssentials.Instance();
  * ```
  */
 class TinyWebEssentials {
