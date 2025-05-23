@@ -2,6 +2,29 @@ import { EventEmitter } from 'events';
 
 /** @typedef {'video'|'audio'|HTMLVideoElement|HTMLAudioElement} ReceiverTags */
 
+/**
+ * TinyMediaReceiver is a lightweight media stream handler designed to manage
+ * continuous streaming of audio or video chunks into an HTMLMediaElement using MediaSource.
+ *
+ * It handles buffering, memory cleanup, and playback synchronization, allowing for dynamic
+ * appending of media data and auto-cleaning old buffer segments to preserve memory and prevent playback issues.
+ *
+ * This class supports custom configuration such as buffer size, cleanup interval, and buffer tolerance.
+ * It emits events throughout the lifecycle, such as when the media source is open, buffer is cleaned,
+ * time is synced, or an error occurs.
+ *
+ * Example usage:
+ * ```js
+ * const receiver = new TinyMediaReceiver({
+ *   element: 'audio',
+ *   mimeType: 'audio/webm;codecs=opus'
+ * });
+ * receiver.push(someAudioChunk);
+ * ```
+ * 
+ * @class
+ * @beta
+ */
 class TinyMediaReceiver {
   /**
    * Important instance used to make event emitter.

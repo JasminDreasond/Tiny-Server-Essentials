@@ -1,3 +1,17 @@
+/**
+ * VolumeProcessor is an AudioWorkletProcessor that calculates the root mean square (RMS)
+ * volume level from incoming audio samples in real-time.
+ *
+ * It listens to the input audio stream and computes the volume on each processing frame,
+ * then posts the calculated volume value back to the main thread via the processor port.
+ *
+ * This processor can be used for volume visualization, metering, or detecting silence/activity in an audio stream.
+ *
+ * Registered under the name: 'volume-processor'.
+ * 
+ * @class
+ * @beta
+ */
 // @ts-ignore
 class VolumeProcessor extends AudioWorkletProcessor {
   constructor() {

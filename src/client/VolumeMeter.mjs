@@ -12,6 +12,22 @@ export const micVolumeFilter = (volume) => {
   return volume / 100;
 };
 
+/**
+ * VolumeMeter provides an interface to connect to a MediaStream (e.g., microphone or screen capture)
+ * and calculate the real-time volume level using a custom AudioWorkletProcessor.
+ *
+ * It supports:
+ * - Volume measurement via a separate AudioWorklet processor ('volume-processor')
+ * - Optional playback of the audio (hearVoice)
+ * - Dynamic module path configuration for the processor script
+ * - Stream cleanup and graceful disconnection of audio nodes
+ *
+ * Use this class to get the volume level of an audio stream for purposes like visual metering
+ * or silence detection.
+ * 
+ * @class
+ * @beta
+ */
 class VolumeMeter {
   #modulePath = '/js/volume-processor.js';
 
