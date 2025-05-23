@@ -13,10 +13,10 @@ Here's your guide to everything:
 
 | 📄 Document                      | 🔍 Description                                                                                                  |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [**Express.md**](./Express.md)   | Explains the `TinyExpress` enhancements and useful types related to HTTP/Express request handling.    |
-| [**Instance.md**](./Instance.md) | Learn about `TinyWebInstance`, a secure server wrapper that manages domains and server validation.              |
-| [**Io.md**](./Io.md)             | Covers the `TinyIo` module, focused on managing WebSocket identity, security, origin checks, and IP extraction. |
-| [**Utils.md**](./Utils.md)       | Utility functions like `extractIpList` and `micVolumeFilter` that support various parts of the stack.           |
+| [**Express**](./Express.md)   | Explains the `TinyExpress` enhancements and useful types related to HTTP/Express request handling.    |
+| [**Instance**](./Instance.md) | Learn about `TinyWebInstance`, a secure server wrapper that manages domains and server validation.              |
+| [**Io**](./Io.md)             | Covers the `TinyIo` module, focused on managing WebSocket identity, security, origin checks, and IP extraction. |
+| [**Utils**](./Utils.md)       | Utility functions like `extractIpList` and `micVolumeFilter` that support various parts of the stack.           |
 
 ---
 
