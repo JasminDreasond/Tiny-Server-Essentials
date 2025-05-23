@@ -8,7 +8,7 @@
  * This processor can be used for volume visualization, metering, or detecting silence/activity in an audio stream.
  *
  * Registered under the name: 'volume-processor'.
- * 
+ *
  * @class
  * @beta
  */

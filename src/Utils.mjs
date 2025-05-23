@@ -1,3 +1,5 @@
+import { micVolumeFilter } from './client/Utils.mjs';
+
 /**
  * Extracts a normalized list of IP addresses from userIp (from req.ip or req.ips).
  * Handles IPv4, IPv6, and IPv4-mapped IPv6 addresses.
@@ -32,3 +34,5 @@ export function extractIpList(userIp) {
   // Remove duplicates
   return [...new Set(cleanIps)];
 }
+
+export { micVolumeFilter };

@@ -21,7 +21,7 @@ import { EventEmitter } from 'events';
  * });
  * receiver.push(someAudioChunk);
  * ```
- * 
+ *
  * @class
  * @beta
  */
