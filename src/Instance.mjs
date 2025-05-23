@@ -108,6 +108,7 @@ class TinyWebInstance {
    * Checks whether a given host string matches a registered domain.
    *
    * This performs a strict comparison against all domains stored internally.
+   * The special domain '0.0.0.0' is treated as a wildcard that matches any host.
    *
    * @param {string} host - The host value to check (e.g., 'example.com', '192.168.0.1:8080').
    * @returns {boolean} `true` if the host matches any registered domain, otherwise `false`.
@@ -115,7 +116,7 @@ class TinyWebInstance {
   hasDomain(host) {
     const cleanHost = this.stripPort(host);
     for (const domain of this.#domains) {
-      if (cleanHost === domain) return true;
+      if (domain === '0.0.0.0' || cleanHost === domain) return true;
     }
     return false;
   }
