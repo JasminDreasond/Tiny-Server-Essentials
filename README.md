@@ -64,9 +64,8 @@ Just clone, install, and run a test server to see the magic in action! ✨
 ## 🛠️ Tech Stack
 
 * **Node.js** (18+ recommended)
-* **Express v5** (beta, but stable)
+* **Express v5**
 * **Socket.IO v4**
-* **No build step** – All modules written in modern native JS (ESM)
 
 ---
 
