@@ -12,7 +12,7 @@ const addModule = (entry, library, isClass = false) => {
   const baseConfig = {
     entry,
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: path.resolve(__dirname, 'dist/client'),
       library,
       libraryTarget: 'window',
       libraryExport: isClass ? library : undefined,
