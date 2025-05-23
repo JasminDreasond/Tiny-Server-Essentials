@@ -14,10 +14,10 @@
 
 ```js
 import http from 'http';
-import TinyWebInstance from './TinyWebInstance.js';
+import TinyWebInstance from 'tiny-server-essentials';
 
 const server = http.createServer(/* handler */);
-const instance = new TinyWebInstance(server);
+const instance = new TinyWebEssentials.Instance(server);
 ```
 
 ### 🔐 Strict Type Checking

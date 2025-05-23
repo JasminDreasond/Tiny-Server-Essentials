@@ -34,6 +34,15 @@ import { extractIpList } from './Utils.mjs';
  * @property {string} [error] - Any parsing error encountered while processing the origin.
  */
 
+/**
+ * TinyExpress provides a simple wrapper and factory for Express v5,
+ * offering utilities and enhanced middleware management.
+ *
+ * This class is ideal for quickly spinning up an Express app with
+ * strongly-typed middleware and error-handling support.
+ *
+ * @class
+ */
 class TinyExpress {
   /** @typedef {import('express').Application} ExpressApp */
   /** @typedef {import('express').Response} Response */

@@ -29,6 +29,16 @@ import { extractIpList } from './Utils.mjs';
  * @property {string} [error] - Any parsing error encountered while processing the origin.
  */
 
+/**
+ * TinyIo is a wrapper for Socket.IO v4,
+ * designed to simplify WebSocket server management,
+ * client communication, and event handling.
+ *
+ * It offers streamlined integration and utility methods
+ * for real-time bidirectional communication.
+ *
+ * @class
+ */
 class TinyIo {
   /** @type {HttpServer|HttpsServer|null} */
   #server = null;
