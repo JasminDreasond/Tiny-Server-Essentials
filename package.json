@@ -1,7 +1,7 @@
 {
   "name": "tiny-server-essentials",
   "version": "1.0.0",
-  "description": "",
+  "description": "A good utility toolkit to unify Express v5 and Socket.IO v4 into a seamless development experience with modular helpers, server wrappers, and WebSocket tools.",
   "scripts": {
     "test": "npm run test:mjs && npm run test:cjs && npm run test:js",
     "test:js": "npx babel-node test/index.js",
@@ -37,7 +37,26 @@
     "type": "git",
     "url": "git+https://github.com/JasminDreasond/Tiny-Express.git"
   },
-  "keywords": [],
+  "keywords": [
+    "express",
+    "express-v5",
+    "socket.io",
+    "socket.io-v4",
+    "websocket",
+    "http-server",
+    "https-server",
+    "nodejs",
+    "express-wrapper",
+    "socketio-wrapper",
+    "express-utility",
+    "socketio-utility",
+    "websocket-manager",
+    "server-wrapper",
+    "domain-matching",
+    "ip-extractor",
+    "devtools",
+    "server-tools"
+  ],
   "author": "Yasmin Seidel (Jasmin Dreasond)",
   "license": "GPL-3.0-only",
   "bugs": {
