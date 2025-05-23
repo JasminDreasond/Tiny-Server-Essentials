@@ -101,6 +101,8 @@ const clean = instance.stripPort('example.com:8080');
 
 Checks if the given host (with or without port) matches any registered domain.
 
+> To allow all hosts, make sure to include `'0.0.0.0'` in the domain whitelist.
+
 ```js
 instance.hasDomain('example.com:443'); // true
 ```
