@@ -44,7 +44,7 @@ Whether you're working with HTTP servers, WebSocket streams, or IP validation, t
 
 If you're working on the **client-side** and want to explore UI filters, browser-related utilities, or anything related to user interactions...
 
-👉 **Check out [`/docs/client`](./docs/client)**
+👉 **Check out [`client`](./client)**
 
 There you'll find:
 
