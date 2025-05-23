@@ -10,8 +10,7 @@ Here's a breakdown of the documentation files and their corresponding source log
 | ---------------------- | ----------------------------------------------------- |
 | `TinyMediaReceiver.md` | Full guide on the continuous media receiver 🎧        |
 | `TinyStreamManager.md` | Main controller for managing stream receivers 🔁      |
-| `Utils.md`             | Utility methods used across the project 🛠️           |
-| `VolumeMeter.md`       | Visual and logical representation of volume input 🎚️ |
+| `VolumeMeter.md`       | Visual and logical representation of volume input 🎚️  |
 
 ---
 
