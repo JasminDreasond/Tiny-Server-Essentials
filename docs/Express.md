@@ -361,7 +361,7 @@ const ipList = appManager.extractIp(req); // returns array of strings
 ➕ **Add a validator function** for a domain check.
 
 ```js
-appManager.addDomainValidator('host', req => req.hostname === 'trusted.com');
+appManager.addDomainValidator('host', req => typeof req.headers.host === 'string' ? this.web.hasDomain(req.headers.host) : false);
 ```
 
 > ❗ `"ALL"` is reserved.

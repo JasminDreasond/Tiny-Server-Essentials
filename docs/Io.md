@@ -262,7 +262,9 @@ The key `"ALL"` is **reserved** and cannot be used.
 🛠️ Example usage:
 
 ```js
-manager.addDomainValidator("host", (req) => req.hostname === "example.com");
+manager.addDomainValidator("host", (socket) => typeof socket.handshake.headers.host === 'string'
+        ? this.web.hasDomain(socket.handshake.headers.host)
+        : false);
 ```
 
 ---
