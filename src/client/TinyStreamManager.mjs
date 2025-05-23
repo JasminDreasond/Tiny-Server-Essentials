@@ -1113,19 +1113,35 @@ export class TinyStreamManager {
    *
    * @param {string} userId - The user id to attach the stream.
    * @param {StreamTypes} type - The stream type, e.g., 'mic'.
-   * @param {string} mime - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {string} mimeType - The mime type, e.g., 'audio/webm;codecs=opus'.
    * @param {ReceiverTags} element - The tag name needs to be `audio` or `video` to attach the stream.
-   * @param {number} [maxBufferBack=10] - Maximum buffer back to keep in the buffer behind the current time.
+   * @param {Object} [options={}]
+   * @param {number} [options.maxBufferBack=10] - Maximum buffer (in seconds) back to keep in the buffer behind the current time.
+   * @param {number} [options.cleanupTime] - Interval time in milliseconds to perform buffer cleanup. Must be a positive number.
+   * @param {number} [options.bufferTolerance] - Tolerance value (in seconds) used when comparing buffer ranges. Must be a positive number.
    * @returns {TinyMediaReceiver} - If the instance has not yet been created, it will be created automatically.
    */
-  initReceiver(userId, type, mime, element, maxBufferBack = 10) {
-    const id = this.getMediaId(userId, type, mime, element);
+  initReceiver(
+    userId,
+    type,
+    mimeType,
+    element,
+    { maxBufferBack = 10, cleanupTime = 100, bufferTolerance = 0.1 } = {},
+  ) {
+    const id = this.getMediaId(userId, type, mimeType, element);
     const oldReceiver = this.#streams.get(id);
     if (oldReceiver) return oldReceiver;
 
-    const receiver = new TinyMediaReceiver(element, mime, maxBufferBack);
+    const receiver = new TinyMediaReceiver({
+      element,
+      mimeType,
+      maxBufferBack,
+      cleanupTime,
+      bufferTolerance,
+    });
+
     this.#streams.set(id, receiver);
-    this.#emit(this.Events.ReceiverAdded, { userId, type, mime, element }, receiver);
+    this.#emit(this.Events.ReceiverAdded, { userId, type, mimeType, element }, receiver);
     return receiver;
   }
 

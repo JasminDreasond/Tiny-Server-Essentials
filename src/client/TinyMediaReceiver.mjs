@@ -277,6 +277,17 @@ class TinyMediaReceiver {
   #element = null;
   #url = '';
 
+  /** @type {null|NodeJS.Timeout} */
+  #cleanupBuffer = null;
+
+  /**
+   * Handles the `sourceopen` event from the MediaSource.
+   * Initializes the SourceBuffer and starts feeding data into it.
+   * Emits an error and destroys the instance if the MIME type is not supported.
+   *
+   * @private
+   * @returns {void}
+   */
   _onSourceOpen() {
     if (!MediaSource.isTypeSupported(this.mimeType)) {
       const err = new Error(`MIME type ${this.mimeType} not supported.`);
@@ -293,6 +304,13 @@ class TinyMediaReceiver {
     this._feedQueue();
   }
 
+  /**
+   * Feeds queued media chunks into the SourceBuffer if it's ready.
+   * Emits FeedQueue event for each chunk and handles errors by emitting an Error event and destroying the instance.
+   *
+   * @private
+   * @returns {void}
+   */
   _feedQueue() {
     if (!this.sourceBuffer || this.queue.length === 0 || this.sourceBuffer.updating) return;
     const chunk = this.queue.shift();
@@ -308,6 +326,15 @@ class TinyMediaReceiver {
     }
   }
 
+  /**
+   * Cleans the SourceBuffer to maintain a limited buffer size.
+   * Removes old buffered data that exceeds the configured max buffer back.
+   * Also adjusts the currentTime if it leaves the valid buffered range.
+   * Emits BufferCleaned and SyncTime events when appropriate.
+   *
+   * @private
+   * @returns {void}
+   */
   _cleanupBuffer() {
     if (!this.sourceBuffer || !this.#element) return;
     if (!this.sourceBuffer.buffered || this.sourceBuffer.updating) return;
@@ -315,7 +342,7 @@ class TinyMediaReceiver {
     const media = this.#element;
     const buffered = this.sourceBuffer.buffered;
     const maxBack = this.getMaxBufferBack();
-    const tolerance = 0.1;
+    const tolerance = this.getTolerance();
 
     if (buffered.length === 0) return;
 
@@ -349,15 +376,28 @@ class TinyMediaReceiver {
   /**
    * Initializes a media player for continuous streaming from received chunks.
    *
-   * @param {ReceiverTags} element - The tag to attach the stream.
-   * @param {string} mimeType - The mime type, e.g., 'audio/webm;codecs=opus'.
-   * @param {number} [maxBufferBack=10] - Maximum buffer back to keep in the buffer behind the current time.
+   * @param {Object} [options={}]
+   * @param {ReceiverTags} [options.element] - The tag to attach the stream.
+   * @param {string} [options.mimeType] - The mime type, e.g., 'audio/webm;codecs=opus'.
+   * @param {number} [options.maxBufferBack=10] - Maximum buffer (in seconds) back to keep in the buffer behind the current time.
+   * @param {number} [options.cleanupTime] - Interval time in milliseconds to perform buffer cleanup. Must be a positive number.
+   * @param {number} [options.bufferTolerance] - Tolerance value (in seconds) used when comparing buffer ranges. Must be a positive number.
    */
-  constructor(element, mimeType, maxBufferBack = 10) {
-    if (!MediaSource.isTypeSupported(mimeType))
+  constructor({
+    element,
+    mimeType,
+    maxBufferBack = 10,
+    cleanupTime = 100,
+    bufferTolerance = 0.1,
+  } = {}) {
+    if (typeof mimeType !== 'string' || !MediaSource.isTypeSupported(mimeType))
       throw new Error(`MIME type not supported: ${mimeType}`);
     if (!Number.isInteger(maxBufferBack) || maxBufferBack <= 0)
       throw new Error('Expected a positive number in maxBufferBack.');
+    if (typeof cleanupTime !== 'number' || cleanupTime <= 0)
+      throw new Error('Expected a positive number for cleanupTime.');
+    if (typeof bufferTolerance !== 'number' || bufferTolerance <= 0)
+      throw new Error('Expected a positive number for bufferTolerance.');
 
     this.mimeType = mimeType;
     /** @type {BufferSource[]} */
@@ -367,6 +407,7 @@ class TinyMediaReceiver {
     this.isBufferUpdating = false;
     this.isEnded = false;
     this.maxBufferBack = maxBufferBack;
+    this.tolerance = bufferTolerance;
 
     if (typeof element === 'string') {
       if (element !== 'audio' && element !== 'video')
@@ -381,7 +422,29 @@ class TinyMediaReceiver {
       this._onSourceOpen();
     });
 
-    setInterval(() => this._cleanupBuffer(), 100);
+    this.#cleanupBuffer = setInterval(() => this._cleanupBuffer(), cleanupTime);
+  }
+
+  /**
+   * Returns the current buffer tolerance in seconds.
+   * @returns {number} The current tolerance value.
+   */
+  getTolerance() {
+    if (typeof this.tolerance !== 'number' || this.tolerance <= 0)
+      throw new Error('Tolerance must be a positive number.');
+    return this.tolerance;
+  }
+
+  /**
+   * Sets a new buffer tolerance value.
+   *
+   * @param {number} value - The new tolerance value in seconds. Must be a positive number.
+   * @throws {Error} If the value is not a positive number.
+   */
+  setTolerance(value) {
+    if (typeof value !== 'number' || value <= 0)
+      throw new Error('Tolerance must be a positive number.');
+    this.tolerance = value;
   }
 
   /**
@@ -448,6 +511,7 @@ class TinyMediaReceiver {
             this.#element.remove();
             this.#element = null;
           }
+          if (this.#cleanupBuffer) clearInterval(this.#cleanupBuffer);
           this.#emit(this.Events.Destroyed);
           this.#events.removeAllListeners();
           this.#sysEvents.removeAllListeners();
