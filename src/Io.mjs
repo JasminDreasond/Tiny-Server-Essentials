@@ -154,13 +154,13 @@ class TinyIo {
 
     this.addDomainValidator('x-forwarded-host', (socket) =>
       typeof socket.handshake.headers['x-forwarded-host'] === 'string'
-        ? this.web.hasDomain(socket.handshake.headers['x-forwarded-host'])
+        ? this.web.canDomain(socket.handshake.headers['x-forwarded-host'])
         : false,
     );
 
     this.addDomainValidator('headerHost', (socket) =>
       typeof socket.handshake.headers.host === 'string'
-        ? this.web.hasDomain(socket.handshake.headers.host)
+        ? this.web.canDomain(socket.handshake.headers.host)
         : false,
     );
 

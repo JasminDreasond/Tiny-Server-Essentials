@@ -99,12 +99,24 @@ const clean = instance.stripPort('example.com:8080');
 
 ### `hasDomain(host: string): boolean` 🔍
 
-Checks if the given host (with or without port) matches any registered domain.
+Checks if the given host (with or without port) strictly matches a registered domain.
+
+```js
+instance.hasDomain('example.com:443'); // true
+```
+
+Internally uses `stripPort()` to normalize the comparison.
+
+---
+
+### `canDomain(host: string): boolean` 🛡️
+
+Checks if the given host (with or without port) is allowed, including support for `'0.0.0.0'` as a wildcard domain.
 
 > To allow all hosts, make sure to include `'0.0.0.0'` in the domain whitelist.
 
 ```js
-instance.hasDomain('example.com:443'); // true
+instance.canDomain('anyhost.com:3000'); // true, if '0.0.0.0' is in the list
 ```
 
 Internally uses `stripPort()` to normalize the comparison.

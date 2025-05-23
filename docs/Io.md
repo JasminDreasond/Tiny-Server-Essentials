@@ -263,7 +263,7 @@ The key `"ALL"` is **reserved** and cannot be used.
 
 ```js
 manager.addDomainValidator("host", (socket) => typeof socket.handshake.headers.host === 'string'
-        ? this.web.hasDomain(socket.handshake.headers.host)
+        ? this.web.canDomain(socket.handshake.headers.host)
         : false);
 ```
 

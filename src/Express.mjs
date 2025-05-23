@@ -395,16 +395,16 @@ class TinyExpress {
 
     this.addDomainValidator('x-forwarded-host', (req) =>
       typeof req.headers['x-forwarded-host'] === 'string'
-        ? this.web.hasDomain(req.headers['x-forwarded-host'])
+        ? this.web.canDomain(req.headers['x-forwarded-host'])
         : false,
     );
 
     this.addDomainValidator('hostname', (req) =>
-      typeof req.hostname === 'string' ? this.web.hasDomain(req.hostname) : false,
+      typeof req.hostname === 'string' ? this.web.canDomain(req.hostname) : false,
     );
 
     this.addDomainValidator('headerHost', (req) =>
-      typeof req.headers.host === 'string' ? this.web.hasDomain(req.headers.host) : false,
+      typeof req.headers.host === 'string' ? this.web.canDomain(req.headers.host) : false,
     );
 
     this.addIpExtractor('ip', (req) => extractIpList(req.ip));

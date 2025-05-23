@@ -105,10 +105,27 @@ class TinyWebInstance {
   }
 
   /**
+   * Determines whether the specified host is allowed based on the registered domain list.
+   *
+   * Performs a strict comparison between the cleaned host and each stored domain.
+   * The special value `'0.0.0.0'` acts as a wildcard, allowing any host to match.
+   * To allow all hosts, ensure that `'0.0.0.0'` is included in the domain list.
+   *
+   * @param {string} host - The host to check (e.g., 'example.com', '192.168.0.1:8080').
+   * @returns {boolean} Returns `true` if the host matches any registered domain; otherwise, `false`.
+   */
+  canDomain(host) {
+    const cleanHost = this.stripPort(host);
+    for (const domain of this.#domains) {
+      if (domain === '0.0.0.0' || cleanHost === domain) return true;
+    }
+    return false;
+  }
+
+  /**
    * Checks whether a given host string matches a registered domain.
    *
    * This performs a strict comparison against all domains stored internally.
-   * The special domain '0.0.0.0' is treated as a wildcard that matches any host.
    *
    * @param {string} host - The host value to check (e.g., 'example.com', '192.168.0.1:8080').
    * @returns {boolean} `true` if the host matches any registered domain, otherwise `false`.
@@ -116,7 +133,7 @@ class TinyWebInstance {
   hasDomain(host) {
     const cleanHost = this.stripPort(host);
     for (const domain of this.#domains) {
-      if (domain === '0.0.0.0' || cleanHost === domain) return true;
+      if (cleanHost === domain) return true;
     }
     return false;
   }
