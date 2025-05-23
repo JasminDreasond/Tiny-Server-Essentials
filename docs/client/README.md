@@ -25,9 +25,10 @@ All JavaScript output files are located in:
 
 This includes:
 
-* `TinyStreamManager.mjs` ➜ **Main entry point** for stream management logic. 🚀
-* `TinyMediaReceiver.mjs` ➜ Class that handles individual stream playback.
-* `VolumeMeter.mjs` ➜ Utility class to display and manage audio levels.
+* [`TinyStreamManager.mjs`](./TinyStreamManager.md) ➜ **Main entry point** for stream management logic. 🚀
+* [`TinyMediaReceiver.mjs`](./TinyMediaReceiver.md) ➜ Class that handles individual stream playback.
+* [`VolumeMeter.mjs`](./VolumeMeter.md) ➜ Utility class to display and manage audio levels.
+* [`Utils`](./Utils.md) ➜ Documentation and helper references for various stream utilities.
 * `volume-processor.js` ➜ 💡 Custom Web Audio API `AudioWorkletProcessor` script.
 
 ---
