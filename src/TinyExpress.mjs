@@ -6,7 +6,7 @@ import { Server as HttpsServer } from 'https';
 import express from 'express';
 import createHttpError from 'http-errors';
 
-import TinyWebInstance from './Instance.mjs';
+import TinyWebInstance from './TinyWebInstance.mjs';
 import { extractIpList } from './Utils.mjs';
 
 /** @typedef {import('express').Request} Request */

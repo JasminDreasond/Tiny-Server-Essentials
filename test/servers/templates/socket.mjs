@@ -1,5 +1,5 @@
 import cookie from 'cookie';
-import TinyIo from '../../../dist/Io.mjs';
+import TinyIo from '../../../dist/TinyIo.mjs';
 
 /**
  * @param {TinyIo} webSocket

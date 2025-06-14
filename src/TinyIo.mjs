@@ -1,7 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { createServer, Server as HttpsServer } from 'https';
 import { Server as SocketIOServer } from 'socket.io';
-import TinyWebInstance from './Instance.mjs';
+import TinyWebInstance from './TinyWebInstance.mjs';
 import { extractIpList } from './Utils.mjs';
 
 /** @typedef {import('socket.io').Socket} Socket */

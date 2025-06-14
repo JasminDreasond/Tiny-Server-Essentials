@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import helmet from 'helmet';
 
-import TinyExpress from '../../../dist/Express.mjs';
+import TinyExpress from '../../../dist/TinyExpress.mjs';
 
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';

@@ -1,7 +1,7 @@
 import * as Utils from './Utils.mjs';
-import TinyWebInstance from './Instance.mjs';
-import TinyExpress from './Express.mjs';
-import TinyIo from './Io.mjs';
+import TinyWebInstance from './TinyWebInstance.mjs';
+import TinyExpress from './TinyExpress.mjs';
+import TinyIo from './TinyIo.mjs';
 
 /**
  * Central access point for all essential modules provided by the TinyWeb toolkit.
