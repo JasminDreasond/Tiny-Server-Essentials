@@ -1,4 +1,5 @@
-import fs from 'fs';
+import { createReadStream, existsSync } from 'fs';
+import { stat } from 'fs/promises';
 import { Readable as ReadableStream } from 'stream';
 import { createHash, randomBytes } from 'crypto';
 import { createServer, Server as HttpServer } from 'http';
@@ -858,6 +859,7 @@ class TinyExpress {
    * @param {Request} req - The HTTP request object, used to detect range headers.
    * @param {Response} res - The HTTP response object to stream the file through.
    * @param {Object} [options={}] - Configuration options for streaming.
+   * @param {boolean} [options.rangeOnlyMode=false] - When enabled, prevents full file streaming and enforces HTTP Range-based partial responses only.
    * @param {string} [options.filePath] - The absolute file path to stream. Required if no stream is provided.
    * @param {ReadableStream} [options.stream] - A readable stream to use instead of reading from filePath.
    * @param {string} [options.contentType='application/octet-stream'] - The MIME type of the streamed content.
@@ -866,7 +868,7 @@ class TinyExpress {
    * @param {string | null} [options.fileName] - Optional file name for the Content-Disposition header.
    * @beta
    */
-  streamFile(
+  async streamFile(
     req,
     res,
     {
@@ -876,20 +878,21 @@ class TinyExpress {
       fileMaxAge = 0,
       lastModified = null,
       fileName = null,
+      rangeOnlyMode = false,
     } = {},
   ) {
     const range = req.headers.range;
     let total = 0;
-    let stat = null;
+    let statData = null;
 
     if (filePath) {
       if (typeof filePath !== 'string')
         throw new Error('"filePath" must be a valid file path string.');
 
-      if (!fs.existsSync(filePath)) throw new Error(`File "${filePath}" not found.`);
+      if (!existsSync(filePath)) throw new Error(`File "${filePath}" not found.`);
 
-      stat = fs.statSync(filePath);
-      total = stat.size;
+      statData = await stat(filePath);
+      total = statData.size;
     } else if (!(stream instanceof ReadableStream))
       throw new Error('Either "filePath" or "stream" must be provided.');
 
@@ -897,7 +900,7 @@ class TinyExpress {
     res.setHeader('Accept-Ranges', 'bytes');
 
     // Last-Modified
-    const lastModDate = new Date(lastModified || stat?.mtime || Date.now());
+    const lastModDate = new Date(lastModified || statData?.mtime || Date.now());
     res.setHeader('Last-Modified', lastModDate.toUTCString());
 
     // Cache headers
@@ -928,13 +931,23 @@ class TinyExpress {
       res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
       res.setHeader('Content-Length', chunkSize);
 
-      const partialStream = fs.createReadStream(filePath, { start, end });
+      const partialStream = createReadStream(filePath, { start, end });
       partialStream.pipe(res);
     } else {
       if (filePath) {
-        res.setHeader('Content-Length', total);
-        const fullStream = fs.createReadStream(filePath);
-        fullStream.pipe(res);
+        if (rangeOnlyMode && !range) {
+          const start = 0;
+          const end = Math.min(total - 1, 1024 * 512); // First 512KB
+          const partialStream = createReadStream(filePath, { start, end });
+          res.status(206);
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+          res.setHeader('Content-Length', end - start + 1);
+          partialStream.pipe(res);
+        } else {
+          res.setHeader('Content-Length', total);
+          const fullStream = createReadStream(filePath);
+          fullStream.pipe(res);
+        }
       } else if (stream instanceof ReadableStream) {
         // Using provided stream
         stream.pipe(res);

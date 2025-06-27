@@ -90,6 +90,7 @@ const insertExpress = (app, http) => {
     try {
       http.streamFile(req, res, {
         filePath,
+        rangeOnlyMode: true,
         contentType: 'audio/mpeg', // ou 'video/mp4'
         fileMaxAge: 3600, // 1h
         fileName: req.params.filename,
