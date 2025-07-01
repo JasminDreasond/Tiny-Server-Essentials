@@ -561,6 +561,7 @@ This function:
 
 ```js
 app.freeMode('./public');
+```
 
 ---
 
