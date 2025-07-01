@@ -538,6 +538,32 @@ Serve large files with partial content support (`Range` headers), such as video 
 
 ---
 
+## 🚀 `freeMode(folder)`
+
+A quick way to launch a **test-only server environment** in Express.js for static files and open CORS access.
+
+### 🔧 What it does
+
+- Serves static files from a folder you specify
+- Enables **unrestricted CORS** (for all origins, headers, and methods)
+- Only works in **development mode** (`NODE_ENV=development`)
+
+### ⚠️ Warning
+
+**Do NOT use this in production!**
+
+This function:
+- Disables all security headers
+- Exposes everything to the public
+- Should only be used for local testing or experiments
+
+### ✅ Usage
+
+```js
+app.freeMode('./public');
+
+---
+
 ## 🧠 Notes
 
 * The `sendFile()` method is optimized for small/medium binary/text blobs that fit in memory.

@@ -230,6 +230,7 @@ class TinyExpress {
       },
     );
   }
+
   /**
    * Modifies a CSRF config option, only if the key exists and value is a string.
    * @param {string} key - Either "cookieName", "headerName", or "errMessage".
@@ -953,6 +954,47 @@ class TinyExpress {
         stream.pipe(res);
       } else throw new Error('Either "stream" must be provided.');
     }
+  }
+
+  /**
+   * Enables a lightweight test-only Express mode for serving static files and open API testing.
+   *
+   * This method sets up an unrestricted CORS environment and exposes a static folder,
+   * allowing any origin to access the content and APIs freely. It also includes permissive
+   * CORS headers and custom middleware headers for development diagnostics.
+   *
+   * ⚠️ **Do not use this in production!**
+   * This mode disables all security measures and is intended **only** for local development,
+   * debugging, or experimentation. All origins, headers, and methods are allowed without validation.
+   *
+   * @throws {Error} If the current environment is not "development".
+   * @throws {TypeError} If `folder` is not a non-empty string.
+   *
+   * @param {string} folder - The path to the folder that will be served as static content.
+   */
+  freeMode(folder) {
+    if (process.env.NODE_ENV !== 'development')
+      throw new Error('[freeMode] This method is only allowed in development mode.');
+    if (typeof folder !== 'string' || folder.trim() === '')
+      throw new TypeError('[freeMode] Expected "folder" to be a non-empty string.');
+    this.root.use(express.static(folder));
+    this.root.use(function (req, res, next) {
+      // Website you wish to allow to connect
+      res.setHeader('Access-Control-Allow-Origin', '*');
+
+      // Request methods you wish to allow
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+
+      // Request headers you wish to allow
+      res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+
+      // Set to true if you need the website to include cookies in the requests sent
+      // to the API (e.g. in case you use sessions)
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+      // Pass to next layer of middleware
+      next();
+    });
   }
 }
 
