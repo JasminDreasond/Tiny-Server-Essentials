@@ -978,7 +978,7 @@ class TinyExpress {
     if (typeof folder !== 'string' || folder.trim() === '')
       throw new TypeError('[freeMode] Expected "folder" to be a non-empty string.');
     this.root.use(express.static(folder));
-    this.root.use(function (req, res, next) {
+    this.root.use((req, res, next) => {
       // Website you wish to allow to connect
       res.setHeader('Access-Control-Allow-Origin', '*');
 
