@@ -87,3 +87,11 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 
 > 🧠 **Note**: This documentation was written by [ChatGPT](https://openai.com/chatgpt), an AI assistant developed by OpenAI, based on the project structure and descriptions provided by the repository author.  
 > If you find any inaccuracies or need improvements, feel free to contribute or open an issue!
+
+---
+
+<div align="center">
+<a href="./img/"><img src="./img/6c2df338-5257-4a2d-9dea-14f9f4ae8aba.png" height="300" /></a>
+<br/>
+Made with tiny love!
+</div>
