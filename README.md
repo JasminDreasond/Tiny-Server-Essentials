@@ -83,10 +83,17 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 
 ---
 
-### 💡 Credits
+## 💡 Credits
 
 > 🧠 **Note**: This documentation was written by [ChatGPT](https://openai.com/chatgpt), an AI assistant developed by OpenAI, based on the project structure and descriptions provided by the repository author.  
 > If you find any inaccuracies or need improvements, feel free to contribute or open an issue!
+
+---
+
+## 🔙 Back to Tiny Essentials
+
+Did you like this module? It’s part of the **Tiny Essentials** collection — a set of minimal yet powerful tools to make development easier.
+👉 [Click here to explore more Tiny Essentials modules](https://github.com/JasminDreasond/Tiny-Essentials)
 
 ---
 
