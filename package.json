@@ -58,7 +58,7 @@
     "server-tools"
   ],
   "author": "Yasmin Seidel (Jasmin Dreasond)",
-  "license": "GPL-3.0-only",
+  "license": "LGPL-3.0-only",
   "bugs": {
     "url": "https://github.com/JasminDreasond/Tiny-Server-Essentials/issues"
   },
@@ -95,6 +95,6 @@
     "express": "^5.1.0",
     "http-errors": "^2.0.0",
     "socket.io": "^4.8.1",
-    "tiny-essentials": "^1.21.3"
+    "tiny-essentials": "^1.21.10"
   }
 }
