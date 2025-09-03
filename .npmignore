@@ -2,6 +2,7 @@
 src
 test
 temp
+md-assets
 .babelrc
 .prettierignore
 .prettierrc.json
