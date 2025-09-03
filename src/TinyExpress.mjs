@@ -709,17 +709,17 @@ class TinyExpress {
     app.use(
       /** @type {RequestHandler} */ (req, res, next) => {
         const err = createHttpError(404, notFoundMsg);
-        next(err);
+        return next(err);
       },
     );
 
     // Middleware global de erro
     app.use(
       /** @type {ErrorRequestHandler} */
-      (err, req, res, next) => {
+      (err, req, res, _next) => {
         const status = err.status || err.statusCode || 500;
         res.status(status);
-        errNext(status, err, req, res);
+        return errNext(status, err, req, res);
       },
     );
   }
